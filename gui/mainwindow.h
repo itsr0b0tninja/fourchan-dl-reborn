@@ -8,6 +8,8 @@
 #include <QTreeWidget>
 #include <QSystemTrayIcon>
 #include <QThread>
+#include <QTimer>
+#include <QDateTime>
 #include "uiimageoverview.h"
 #include "uiinfo.h"
 #include "uiconfig.h"
@@ -65,13 +67,20 @@ private:
     QList<QString> updateableComponents;
     bool runUpdate;
     bool checkUpdaterVersion;
+    QTimer* periodicUpdateTimer;
+    QDateTime nextPeriodicUpdateCheckUtc;
+    bool githubUpdateCheckInProgress;
+    bool githubUpdateCheckManual;
+    int periodicUpdateIntervalDays;
     EcWin7 win7;
     bool _paused;
 
     void restoreWindowSettings(void);
     void updateWidgetSettings(void);
     void checkVersion(QString ver);
-    void checkForUpdates(QString xml);
+    void checkForUpdates(QString xml, bool manual);
+    void scheduleNextPeriodicUpdateCheck();
+    void beginGitHubUpdateCheck(bool manual);
     bool checkIfNewerVersion(QString _new, QString _old);
     void addToHistory(QString s, QString title);
     void removeFromHistory(QString key);
@@ -139,6 +148,8 @@ private slots:
     void getConsoleVersion();
     void askForUpdate();
     void checkForGitHubUpdates();
+    void periodicUpdateTimerTimeout();
+    void reloadUpdateCheckSettings();
     void githubUpdateCheckFailed(QUrl, int);
     void markAllViewed();
 

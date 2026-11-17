@@ -30,6 +30,12 @@ MainWindow::MainWindow(QWidget *parent) :
 
     runUpdate = false;
     checkUpdaterVersion = false;
+    githubUpdateCheckInProgress = false;
+    githubUpdateCheckManual = false;
+    periodicUpdateIntervalDays = 1;
+    periodicUpdateTimer = new QTimer(this);
+    periodicUpdateTimer->setSingleShot(true);
+    connect(periodicUpdateTimer, SIGNAL(timeout()), this, SLOT(periodicUpdateTimerTimeout()));
 
     connect(this, SIGNAL(removeFiles(QStringList)), thumbnailRemover, SLOT(removeFiles(QStringList)));
     ui->setupUi(this);
@@ -79,6 +85,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
     connect(uiConfig, SIGNAL(configurationChanged()), this, SLOT(loadOptions()));
+    connect(uiConfig, SIGNAL(configurationChanged()), this, SLOT(reloadUpdateCheckSettings()));
     connect(uiConfig, SIGNAL(configurationChanged()), blackList, SLOT(loadSettings()));
     connect(uiConfig, SIGNAL(configurationChanged()), downloadManager, SLOT(loadSettings()));
     connect(uiConfig, SIGNAL(deleteAllThumbnails()), thumbnailRemover, SLOT(removeAll()));
@@ -112,8 +119,11 @@ MainWindow::MainWindow(QWidget *parent) :
 #ifdef __DEBUG__
     createSupervisedDownload(QUrl("file:d:/Qt/fourchan-dl/webupdate.xml"));
 #else
-    checkForGitHubUpdates();
+    if (settings->value("updater/check_on_startup", true).toBool())
+        beginGitHubUpdateCheck(false);
 #endif
+    // Every launch begins an independent session timer; no deadline is persisted.
+    reloadUpdateCheckSettings();
 
 #ifdef Q_OS_WIN
     win7.init((HWND)this->winId());
@@ -428,7 +438,10 @@ void MainWindow::processRequestResponse(QUrl url, QByteArray ba, bool cached) {
     const QByteArray body = ba.trimmed();
     if (url.toString().contains("webupdate.xml")
             || (body.startsWith("<updates>") && body.contains("<win32-qt5>"))) {
-        checkForUpdates(QString::fromUtf8(ba));
+        const bool manual = githubUpdateCheckManual;
+        githubUpdateCheckInProgress = false;
+        githubUpdateCheckManual = false;
+        checkForUpdates(QString::fromUtf8(ba), manual);
     }
     else {
         QLOG_WARN() << "MainWindow :: MainWindow should only ask for webupdate.xml but response was for" << url.toString();
@@ -749,15 +762,70 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
 void MainWindow::githubUpdateCheckFailed(QUrl url, int errorCode) {
     if (!url.toString().contains("webupdate.xml"))
         return;
-    if (errorCode == 404)
-        ui->statusBar->showMessage(tr("No GitHub release has been published yet."), 8000);
-    else
-        ui->statusBar->showMessage(tr("GitHub update check failed. Check your network connection."), 8000);
+    const bool manual = githubUpdateCheckManual;
+    githubUpdateCheckInProgress = false;
+    githubUpdateCheckManual = false;
+    // Scheduled failures are logged, not shown as repeated user interruptions.
+    QLOG_WARN() << "MainWindow :: GitHub update check failed with HTTP/error code" << errorCode;
+    if (manual) {
+        if (errorCode == 404)
+            ui->statusBar->showMessage(tr("No GitHub release has been published yet."), 8000);
+        else
+            ui->statusBar->showMessage(tr("GitHub update check failed. Check your network connection."), 8000);
+    }
+}
+
+void MainWindow::beginGitHubUpdateCheck(bool manual) {
+    if (githubUpdateCheckInProgress) {
+        if (manual)
+            ui->statusBar->showMessage(tr("An update check is already in progress."), 4000);
+        return;
+    }
+    githubUpdateCheckInProgress = true;
+    githubUpdateCheckManual = manual;
+    if (manual)
+        ui->statusBar->showMessage(tr("Checking GitHub Releases for updates..."), 5000);
+    createSupervisedDownload(QUrl("https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest/download/webupdate.xml"));
 }
 
 void MainWindow::checkForGitHubUpdates() {
-    ui->statusBar->showMessage(tr("Checking GitHub Releases for updates..."), 5000);
-    createSupervisedDownload(QUrl("https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest/download/webupdate.xml"));
+    beginGitHubUpdateCheck(true);
+}
+
+void MainWindow::scheduleNextPeriodicUpdateCheck() {
+    if (!settings->value("updater/check_periodic", true).toBool()) {
+        periodicUpdateTimer->stop();
+        nextPeriodicUpdateCheckUtc = QDateTime();
+        return;
+    }
+
+    const qint64 remaining = QDateTime::currentDateTimeUtc().msecsTo(nextPeriodicUpdateCheckUtc);
+    if (remaining <= 0) {
+        // The timer runs from launch (or last scheduled check), not the
+        // previous session. A delayed wake-up is one check, not a burst.
+        nextPeriodicUpdateCheckUtc = QDateTime::currentDateTimeUtc().addDays(periodicUpdateIntervalDays);
+        beginGitHubUpdateCheck(false);
+        periodicUpdateTimer->start(static_cast<int>(qMin<qint64>(86400000, 
+            QDateTime::currentDateTimeUtc().msecsTo(nextPeriodicUpdateCheckUtc))));
+        return;
+    }
+    // QTimer intervals use int milliseconds: use 24-hour chunks for X days.
+    periodicUpdateTimer->start(static_cast<int>(qMin<qint64>(remaining, 86400000)));
+}
+
+void MainWindow::periodicUpdateTimerTimeout() {
+    scheduleNextPeriodicUpdateCheck();
+}
+
+void MainWindow::reloadUpdateCheckSettings() {
+    periodicUpdateIntervalDays = qBound(1, settings->value("updater/check_interval_days", 1).toInt(), 365);
+    if (!settings->value("updater/check_periodic", true).toBool()) {
+        periodicUpdateTimer->stop();
+        nextPeriodicUpdateCheckUtc = QDateTime();
+        return;
+    }
+    nextPeriodicUpdateCheckUtc = QDateTime::currentDateTimeUtc().addDays(periodicUpdateIntervalDays);
+    scheduleNextPeriodicUpdateCheck();
 }
 
 void MainWindow::createSupervisedDownload(QUrl url) {
@@ -770,7 +838,7 @@ void MainWindow::removeSupervisedDownload(QUrl url) {
     requestHandler->cancel(url);
 }
 
-void MainWindow::checkForUpdates(QString xml) {
+void MainWindow::checkForUpdates(QString xml, bool manual) {
     runUpdate = false;
     updateableComponents.clear();
     QRegExp rx(QString("<%1>([\\w\\W]+[^<])+</%1>").arg(UPDATE_TREE), Qt::CaseInsensitive, QRegExp::RegExp2);
@@ -840,10 +908,28 @@ void MainWindow::checkForUpdates(QString xml) {
 
     if (runUpdate) {
         ui->menuBar->addAction(ui->actionAskForUpdate);
-        ui->statusBar->showMessage(tr("A GitHub update is available."), 8000);
+        // Persist the last notified version(s) to avoid repeating the same
+        // in-app notification across timer checks and application restarts.
+        QStringList versions;
+        foreach (const QString &key, updateableComponents) {
+            const component_information c = components.value(key);
+            versions << QString("%1=%2").arg(key, c.remote_version);
+        }
+        versions.sort();
+        const QString notificationKey = versions.join("|");
+        const bool notify = settings->value("updater/notify_new_version", true).toBool();
+        if (notify && !notificationKey.isEmpty()
+                && settings->value("updater/last_notified_version").toString() != notificationKey) {
+            settings->setValue("updater/last_notified_version", notificationKey);
+            settings->sync();
+            ui->statusBar->showMessage(tr("A GitHub update is available. Select Update Available for details."), 12000);
+        } else if (manual) {
+            ui->statusBar->showMessage(tr("A GitHub update is available."), 8000);
+        }
     } else {
         ui->menuBar->removeAction(ui->actionAskForUpdate);
-        ui->statusBar->showMessage(tr("No newer GitHub release available."), 5000);
+        if (manual)
+            ui->statusBar->showMessage(tr("No newer GitHub release available."), 5000);
     }
     QLOG_TRACE() << "MainWindow :: " << xml;
 }

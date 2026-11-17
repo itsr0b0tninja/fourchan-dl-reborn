@@ -1,6 +1,10 @@
 ﻿#include "uiconfig.h"
 #include "fourchanrequestheaders.h"
 #include "ui_uiconfig.h"
+#include <QGroupBox>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
 
 UIConfig::UIConfig(QWidget *parent) :
     QDialog(parent),
@@ -11,6 +15,27 @@ UIConfig::UIConfig(QWidget *parent) :
     downloadVideosCheckBox = new QCheckBox(tr("Download MP4 and WebM videos by default"), this);
     downloadVideosCheckBox->setToolTip(tr("Individual threads can override this setting beside their rescan options."));
     ui->formLayout->addRow(tr("Videos"), downloadVideosCheckBox);
+
+    // Small update-check section in General; the existing update action and
+    // version-information dialog remain unchanged.
+    QGroupBox* updateGroup = new QGroupBox(tr("Update checking"), this);
+    QVBoxLayout* updateLayout = new QVBoxLayout(updateGroup);
+    updateStartupCheckBox = new QCheckBox(tr("Check for updates on startup"), updateGroup);
+    updatePeriodicCheckBox = new QCheckBox(tr("Check every"), updateGroup);
+    updateIntervalDaysSpinBox = new QSpinBox(updateGroup);
+    updateIntervalDaysSpinBox->setRange(1, 365);
+    updateIntervalDaysSpinBox->setSuffix(tr(" days"));
+    updateIntervalDaysSpinBox->setToolTip(tr("Session-based interval; starts again whenever the application opens."));
+    updateNotifyCheckBox = new QCheckBox(tr("Notify when a new version is available"), updateGroup);
+    QHBoxLayout* intervalRow = new QHBoxLayout();
+    intervalRow->addWidget(updatePeriodicCheckBox);
+    intervalRow->addWidget(updateIntervalDaysSpinBox);
+    intervalRow->addStretch();
+    updateLayout->addWidget(updateStartupCheckBox);
+    updateLayout->addLayout(intervalRow);
+    updateLayout->addWidget(updateNotifyCheckBox);
+    ui->formLayout_3->addRow(updateGroup);
+    connect(updatePeriodicCheckBox, SIGNAL(toggled(bool)), updateIntervalDaysSpinBox, SLOT(setEnabled(bool)));
 
     _removing_thumbnails = false;
 
@@ -48,6 +73,13 @@ void UIConfig::loadSettings(void) {
     QStringList sl;
     int index;
     bool b;
+
+    settings->beginGroup("updater");
+    updateStartupCheckBox->setChecked(settings->value("check_on_startup", true).toBool());
+    updatePeriodicCheckBox->setChecked(settings->value("check_periodic", true).toBool());
+    updateIntervalDaysSpinBox->setValue(qBound(1, settings->value("check_interval_days", 1).toInt(), 365));
+    updateNotifyCheckBox->setChecked(settings->value("notify_new_version", true).toBool());
+    settings->endGroup();
 
     settings->beginGroup("options");
     ui->leDefaultSavepath->setText(settings->value("default_directory","").toString());
@@ -175,6 +207,13 @@ void UIConfig::loadSettings(void) {
 }
 
 void UIConfig::accept(void) {
+    settings->beginGroup("updater");
+        settings->setValue("check_on_startup", updateStartupCheckBox->isChecked());
+        settings->setValue("check_periodic", updatePeriodicCheckBox->isChecked());
+        settings->setValue("check_interval_days", updateIntervalDaysSpinBox->value());
+        settings->setValue("notify_new_version", updateNotifyCheckBox->isChecked());
+    settings->endGroup();
+
     settings->beginGroup("options");
         settings->setValue("default_directory", ui->leDefaultSavepath->text());
         settings->setValue("tab_position", ui->cmbTabPosition->currentIndex());

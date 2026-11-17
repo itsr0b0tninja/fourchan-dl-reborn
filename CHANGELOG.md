@@ -1,5 +1,13 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.3.1 — Configurable, session-based automatic update checks
+- Add three default-on preferences under Settings → General: check GitHub on startup, check every X days (default: one day), and notify of new releases.
+- Start a fresh periodic countdown on every application launch and after each scheduled check; do not persist the countdown across sessions.
+- Keep scheduled checks lightweight and prevent overlapping GitHub checks; scheduled failures are logged without intrusive notification.
+- Show in-app notification once per newly detected version, remembered across application restarts; retain existing Update Available action and detail dialog.
+- Preserve the manual Check for Updates action regardless of automatic preferences.
+- Never automatically download executable updates or start installation.
+
 ## v0.2.6 — Global/per-thread video settings, attachment counts and corrected thread status
 - Add a Download Manager preference to download MP4/WebM videos by default (enabled).
 - Add per-thread video override next to the Rescan Thread controls: global / download / skip, saved with thread session settings.
