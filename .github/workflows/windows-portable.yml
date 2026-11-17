@@ -56,6 +56,8 @@ jobs:
           pushd ci
           qmake-qt5 tls-smoke.pro
           mingw32-make -j2
+          qmake-qt5 streaming-smoke.pro
+          mingw32-make -j2
           popd
           echo "Built executable files:"
           find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'
@@ -66,6 +68,7 @@ jobs:
           test -s portable/plugins/parser4chan.dll
           test -s portable/updater/upd4t3r.exe
           test -s portable/tls-smoke.exe
+          test -s portable/streaming-smoke.exe
 
       - name: Bundle the Windows Qt runtime
         shell: msys2 {0}
@@ -146,6 +149,17 @@ jobs:
             throw "Portable Qt TLS smoke test failed (exit code $LASTEXITCODE)."
           }
           Remove-Item "$root\tls-smoke.exe"
+
+      - name: Verify streamed file completion and retry state on Windows
+        shell: pwsh
+        run: |
+          $root = (Resolve-Path 'portable').Path
+          $env:PATH = "$root;$env:SystemRoot\System32;$env:SystemRoot"
+          & "$root\streaming-smoke.exe"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Streaming file smoke test failed (exit code $LASTEXITCODE)."
+          }
+          Remove-Item "$root\streaming-smoke.exe"
 
       - name: Create downloadable portable ZIP
         shell: pwsh
