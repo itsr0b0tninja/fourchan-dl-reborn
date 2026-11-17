@@ -33,6 +33,7 @@ jobs:
             mingw-w64-ucrt-x86_64-qt5-tools
             mingw-w64-ucrt-x86_64-qt5-svg
             mingw-w64-ucrt-x86_64-qt5-imageformats
+            mingw-w64-ucrt-x86_64-openssl
 
       - name: Compile application, 4chan parser and updater
         shell: msys2 {0}
@@ -95,12 +96,11 @@ jobs:
           # Qt5Network loads TLS providers at runtime, so their DLLs are
           # explicitly included even though PE import walking cannot see them.
           for dll in libssl-3-x64.dll libcrypto-3-x64.dll; do
-            if test -s "/ucrt64/bin/$dll"; then
-              cp -v "/ucrt64/bin/$dll" portable/
-              cp -v "/ucrt64/bin/$dll" portable/updater/
-              copy_deps "/ucrt64/bin/$dll" portable
-              copy_deps "/ucrt64/bin/$dll" portable/updater
-            fi
+            test -s "/ucrt64/bin/$dll"
+            cp -v "/ucrt64/bin/$dll" portable/
+            cp -v "/ucrt64/bin/$dll" portable/updater/
+            copy_deps "/ucrt64/bin/$dll" portable
+            copy_deps "/ucrt64/bin/$dll" portable/updater
           done
           cp LICENSE portable/LICENSE.txt
           printf '%s\n' \
@@ -114,6 +114,8 @@ jobs:
           test -s portable/Qt5Core.dll
           test -s portable/Qt5Network.dll
           test -s portable/updater/Qt5Network.dll
+          test -s portable/libssl-3-x64.dll
+          test -s portable/updater/libssl-3-x64.dll
           find portable -maxdepth 2 -type f | sort
 
       - name: Create downloadable portable ZIP
