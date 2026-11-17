@@ -6,6 +6,8 @@
 #include <QTreeWidget>
 #include <QLabel>
 #include <QDebug>
+#include <QFile>
+#include <QTextStream>
 #include "apptheme.h"
 
 int main(int argc, char **argv) {
@@ -53,13 +55,27 @@ int main(int argc, char **argv) {
     if (app.palette() != original ||
             app.styleSheet() != originalCss ||
             app.style()->objectName() != originalStyle) {
-        qWarning() << "Light restoration mismatch:"
-                   << "palette equal=" << (app.palette() == original)
-                   << "CSS equal=" << (app.styleSheet() == originalCss)
-                   << "old style=" << originalStyle
-                   << "restored style=" << app.style()->objectName()
-                   << "original window=" << original.color(QPalette::Window)
-                   << "restored window=" << app.palette().color(QPalette::Window);
+        QFile output("../portable/theme-smoke-diagnostics.txt");
+        if (output.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+            QTextStream out(&output);
+            out << "palette_equal=" << (app.palette() == original)
+                << " css_equal=" << (app.styleSheet() == originalCss)
+                << " original_style=" << originalStyle
+                << " restored_style=" << app.style()->objectName() << "\n";
+            for (int g = QPalette::Active; g <= QPalette::Inactive; ++g) {
+                const QPalette::ColorGroup group = static_cast<QPalette::ColorGroup>(g);
+                for (int k = 0; k < QPalette::NColorRoles; ++k) {
+                    const QPalette::ColorRole role = static_cast<QPalette::ColorRole>(k);
+                    if (app.palette().brush(group, role) != original.brush(group, role)) {
+                        out << "mismatch group=" << g << " role=" << k
+                            << " old=" << original.color(group, role).name()
+                            << " restored=" << app.palette().color(group, role).name()
+                            << "\n";
+                    }
+                }
+            }
+            out.flush();
+        }
         return 11;
     }
     if (AppTheme::overviewTextColor() != QColor(Qt::black) ||

@@ -71,7 +71,10 @@ jobs:
           mingw32-make -j2
           # Run against the real Qt widget palette and style while the full
           # MSYS2 runtime (including the offscreen platform plugin) is present.
-          QT_QPA_PLATFORM=offscreen ../portable/theme-smoke.exe
+          if ! QT_QPA_PLATFORM=offscreen ../portable/theme-smoke.exe; then
+            cat ../portable/theme-smoke-diagnostics.txt || true
+            exit 1
+          fi
           rm -f ../portable/theme-smoke.exe
           popd
           echo "Built executable files:"
