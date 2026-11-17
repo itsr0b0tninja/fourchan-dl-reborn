@@ -141,6 +141,7 @@ private slots:
     void stopDownload(void);
     void download(bool b);
     void processRequestResponse(QUrl url, QByteArray ba, bool cached);
+    void processDownloadedFile(QUrl url, QString filename);
     void setCompleted(QString uri, QString filename);
     bool isImage(QUrl);
     void updateDownloadStatus();
