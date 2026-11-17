@@ -9,7 +9,7 @@ RequestHandler::RequestHandler(QObject *parent) :
     }
 }
 
-void RequestHandler::request(QUrl u, int priority) {
+void RequestHandler::request(QUrl u, int priority, qint64 expectedSize) {
     qint64 uid;
     int prio;
     QString sUrl;
@@ -30,7 +30,7 @@ void RequestHandler::request(QUrl u, int priority) {
     }
 
     if (downloadManager != 0) {
-        uid = downloadManager->requestDownload(this, u, prio);
+        uid = downloadManager->requestDownload(this, u, prio, expectedSize);
         QLOG_TRACE() << "RequestHandler :: Adding request" << uid << ":" << u.toString() << "prio" <<prio;
         requests.insert(uid, u);
     }
