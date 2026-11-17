@@ -16,6 +16,7 @@
 #include "foldershortcuts.h"
 #include "pluginmanager.h"
 #include "uiimageviewer.h"
+#include "apptheme.h"
 #include "QsLog.h"
 #include "QsLogDest.h"
 
@@ -42,7 +43,7 @@ int main(int argc, char *argv[])
     // Portable mode: resolve settings.ini, thumbnails and updater paths beside the executable.
     QDir::setCurrent(a.applicationDirPath());
     a.setApplicationName("4chan Downloader Reborn");
-    a.setApplicationVersion("0.2.2");
+    a.setApplicationVersion(PROGRAM_VERSION);
     QSettings settings("settings.ini", QSettings::IniFormat);
     int logLevel;
 
@@ -55,6 +56,10 @@ int main(int argc, char *argv[])
 #else
     a.setStyle("plastique");
 #endif
+
+    // Capture the existing native Light look before any widgets are created;
+    // saved Dark mode uses the application-wide charcoal Fusion palette.
+    AppTheme::applyTheme(settings.value("options/theme", "light").toString());
 
     // init the logging mechanism
     QsLogging::Logger& logger = QsLogging::Logger::instance();

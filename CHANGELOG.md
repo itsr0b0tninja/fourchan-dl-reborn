@@ -1,5 +1,14 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.4.1 — Optional charcoal dark mode
+- Add a two-option Theme preference under Settings → General: Light (default) and Dark.
+- Preserve the original Windows Light look and default for existing installations; do not follow the Windows system theme automatically.
+- Introduce a consistent charcoal Qt Fusion palette with blue highlights, accessible selection contrast and dark menus, tabs, progress bars, scrollbars, tooltips, and thread/thumbnail surfaces.
+- Apply theme changes immediately when Settings are saved and persist the preference across restarts.
+- Make thread overview normal/new-image text and the logging warning theme-aware; preserve the existing Light colours.
+- Apply globally, including dialogs and the internal image viewer; no changes to the downloader, thread mover, viewer functionality or thumbnail generation.
+- Add a Qt Widgets smoke test covering Light defaults, Dark palette, theme-aware status colours, live switching, native-Light restoration and invalid preference fallback.
+
 ## v0.3.2 — One-click thread move and close
 - Replace only the Open Image Preview toolbar button with a folder/arrow Move Thread button. Preserve the internal image viewer, its configuration, thumbnail double-click and Open File actions.
 - Add a single 'Move threads to' destination root in Settings → Thread.

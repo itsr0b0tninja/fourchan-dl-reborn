@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include <QDir>
 #include <QHeaderView>
+#include "apptheme.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -84,6 +85,7 @@ MainWindow::MainWindow(QWidget *parent) :
 //    connect(requestHandler, SIGNAL(responseError(QUrl,int)), this, SLOT(handleRequestError(QUrl,int)));
 
     connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
+    connect(uiConfig, SIGNAL(configurationChanged()), this, SLOT(refreshApplicationTheme()));
     connect(uiConfig, SIGNAL(configurationChanged()), this, SLOT(loadOptions()));
     connect(uiConfig, SIGNAL(configurationChanged()), this, SLOT(reloadUpdateCheckSettings()));
     connect(uiConfig, SIGNAL(configurationChanged()), blackList, SLOT(loadSettings()));
@@ -466,6 +468,17 @@ void MainWindow::saveSettings(void) {
     imageViewer->saveSettings();
 }
 
+void MainWindow::refreshApplicationTheme(void) {
+    // Configuration is persisted by UIConfig before configurationChanged is emitted.
+    // Apply immediately to existing dialogs, tabs and the internal viewer.
+    AppTheme::applyTheme(settings->value("options/theme", "light").toString());
+    uiConfig->refreshThemeWarning();
+    // Existing thread overview items have explicit foreground colours that
+    // must be refreshed whenever a different palette becomes active.
+    updateThreadOverview();
+    ui->threadOverview->viewport()->update();
+}
+
 void MainWindow::loadOptions(void) {
     settings->beginGroup("options");
         defaultDirectory = settings->value("default_directory", "").toString();
@@ -742,13 +755,13 @@ void MainWindow::updateThreadOverview() {
 
                     if (k == 0) {
                         if (tab->hasNewImages()) {
-                            item->setTextColor(0, Qt::darkGreen);
+                            item->setTextColor(0, AppTheme::overviewNewImagesColor());
                             f.setBold(true);
                             item->setFont(0, f);
                             QLOG_TRACE() << Q_FUNC_INFO << "tab" << i << "Changing font to bold/red";
                         }
                         else {
-                            item->setTextColor(0, Qt::black);
+                            item->setTextColor(0, AppTheme::overviewTextColor());
                             f.setBold(false);
                             item->setFont(0, f);
                             QLOG_TRACE() << Q_FUNC_INFO << "tab" << i << "Changing font to normal";

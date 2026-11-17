@@ -36,6 +36,7 @@ SOURCES += main.cpp\
     thumbnailcreator.cpp \
     thumbnailremover.cpp \
     threadfilemover.cpp \
+    apptheme.cpp \
     uipendingrequests.cpp \
     HtmlEntities.cpp
 
@@ -66,6 +67,7 @@ HEADERS  += mainwindow.h \
     thumbnailcreator.h \
     thumbnailremover.h \
     threadfilemover.h \
+    apptheme.h \
     uipendingrequests.h \
     HtmlEntities.h
 
@@ -89,7 +91,7 @@ os2: RC_FILE = fourchan-dl-os2.rc
 macx: ICON = resources/fourchan-dl.icns
 
 BUILDDATE = __DATE__
-VERSION = 0.3.2
+VERSION = 0.4.1
 DEFINES += BUILDDATE=$${BUILDDATE} PROGRAM_VERSION="\\\"$${VERSION}\\\"" __GUI__
 #DEFINES += QT_NO_URL_CAST_FROM_STRING
 #DEFINES += QT_NO_CAST_FROM_ASCII

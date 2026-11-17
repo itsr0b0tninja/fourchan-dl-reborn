@@ -125,6 +125,7 @@ private slots:
     void showConfiguration(void);
     void setDefaultDirectory(QString);
     void loadOptions(void);
+    void refreshApplicationTheme(void);
     void processCloseRequest(UIImageOverview*, int);
     void createTab(QString);
     void startAll(void);

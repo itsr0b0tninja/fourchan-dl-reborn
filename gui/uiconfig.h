@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QCheckBox>
 #include <QSpinBox>
+#include <QComboBox>
 #include <QLineEdit>
 #include <QFileDialog>
 #include "uilisteditor.h"
@@ -30,6 +31,7 @@ private:
     Ui::UIConfig *ui;
     QSettings* settings;
     QCheckBox* downloadVideosCheckBox;
+    QComboBox* themeSelector;
     QLineEdit* moveThreadFolderEdit;
     QCheckBox* updateStartupCheckBox;
     QCheckBox* updatePeriodicCheckBox;
@@ -42,6 +44,7 @@ private:
 
 public slots:
     void thumbnailDeletionFinished();
+    void refreshThemeWarning();
 private slots:
     void accept(void);
     void reject(void);

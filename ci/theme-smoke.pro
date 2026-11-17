@@ -1,0 +1,9 @@
+QT += core gui widgets
+TEMPLATE = app
+CONFIG += console c++11
+CONFIG -= app_bundle
+TARGET = theme-smoke
+DESTDIR = ../portable
+INCLUDEPATH += ../gui
+SOURCES += theme-smoke.cpp ../gui/apptheme.cpp
+HEADERS += ../gui/apptheme.h

@@ -5,12 +5,21 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include "apptheme.h"
 
 UIConfig::UIConfig(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::UIConfig)
 {
     ui->setupUi(this);
+
+    // Two explicit themes only. Light remains the default and retains the
+    // existing native Windows style; Dark uses the charcoal Fusion palette.
+    themeSelector = new QComboBox(this);
+    themeSelector->addItem(tr("Light"), QStringLiteral("light"));
+    themeSelector->addItem(tr("Dark"), QStringLiteral("dark"));
+    themeSelector->setToolTip(tr("Changes apply when you save Settings, without restarting."));
+    ui->formLayout_3->insertRow(1, tr("Theme"), themeSelector);
 
     downloadVideosCheckBox = new QCheckBox(tr("Download MP4 and WebM videos by default"), this);
     downloadVideosCheckBox->setToolTip(tr("Individual threads can override this setting beside their rescan options."));
@@ -65,6 +74,7 @@ UIConfig::UIConfig(QWidget *parent) :
 
     loadSettings();
     loadShortcuts();
+    refreshThemeWarning();
 
     connect(timeoutValueEditor, SIGNAL(valuesChanged()), this, SLOT(loadSettings()));
     connect(ui->cbUseProxy, SIGNAL(toggled(bool)), this, SLOT(toggleProxy(bool)));
@@ -94,6 +104,9 @@ void UIConfig::loadSettings(void) {
     settings->endGroup();
 
     settings->beginGroup("options");
+    const QString themeName = settings->value("theme", "light").toString().trimmed().toLower();
+    const int themeIndex = themeSelector->findData(themeName);
+    themeSelector->setCurrentIndex(themeIndex < 0 ? 0 : themeIndex);
     ui->leDefaultSavepath->setText(settings->value("default_directory","").toString());
     moveThreadFolderEdit->setText(settings->value("move_thread_directory", "").toString());
     ui->cmbTabPosition->setCurrentIndex(settings->value("tab_position",3).toInt());
@@ -229,6 +242,7 @@ void UIConfig::accept(void) {
 
     settings->beginGroup("options");
         settings->setValue("default_directory", ui->leDefaultSavepath->text());
+        settings->setValue("theme", themeSelector->itemData(themeSelector->currentIndex()).toString());
         settings->setValue("move_thread_directory", moveThreadFolderEdit->text().trimmed());
         settings->setValue("tab_position", ui->cmbTabPosition->currentIndex());
 
@@ -392,6 +406,16 @@ void UIConfig::deleteShortcut() {
         folderShortcuts->deleteShortcut(name);
     else
         ui->listWidget->removeItemWidget(ui->listWidget->currentItem());
+}
+
+void UIConfig::refreshThemeWarning() {
+    // The original .ui embeds dark-red rich text, which is difficult to read
+    // against charcoal. Keep the wording and visibility behaviour intact.
+    ui->lLogLevelWarning->setText(
+        QStringLiteral("<span style=\"font-weight:600;color:%1;\">"
+            "Warning: Setting logging level to &lt;Trace&gt; may/will slow down "
+            "the program and generate a huge logfile</span>")
+        .arg(AppTheme::warningTextColor()));
 }
 
 void UIConfig::toggleLogLevelWarning(QString s) {

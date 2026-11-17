@@ -67,6 +67,12 @@ jobs:
           mingw32-make -j2
           qmake-qt5 thread-move-smoke.pro
           mingw32-make -j2
+          qmake-qt5 theme-smoke.pro
+          mingw32-make -j2
+          # Run against the real Qt widget palette and style while the full
+          # MSYS2 runtime (including the offscreen platform plugin) is present.
+          QT_QPA_PLATFORM=offscreen ../portable/theme-smoke.exe
+          rm -f ../portable/theme-smoke.exe
           popd
           echo "Built executable files:"
           find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'
