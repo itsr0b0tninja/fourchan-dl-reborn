@@ -39,13 +39,16 @@ jobs:
           set -euo pipefail
           mkdir -p portable/plugins
           pushd gui
-          qmake-qt5 gui.pro 'TARGET=fourchan-dl' 'DESTDIR=../portable'
+          qmake-qt5 gui.pro
           mingw32-make -j2
           popd
           pushd plugins/parser4chan
-          qmake-qt5 parser4chan.pro 'TARGET=parser4chan' 'DESTDIR=../../portable/plugins'
+          qmake-qt5 parser4chan.pro
           mingw32-make -j2
           popd
+          # The legacy .pro files put GUI and plugin DLLs in different parent folders.
+          cp -v ../fourchan-dl.exe portable/fourchan-dl.exe
+          cp -v parser4chan.dll portable/plugins/parser4chan.dll
           test -s portable/fourchan-dl.exe
           test -s portable/plugins/parser4chan.dll
 
