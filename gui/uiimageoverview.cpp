@@ -427,6 +427,17 @@ void UIImageOverview::openFile(void) {
 void UIImageOverview::errorHandler(QUrl url, int err) {
     const QString uri = url.toString();
     if (isImage(url)) {
+        bool tracked = false;
+        for (int i=0; i<images.count(); ++i) {
+            if (images.at(i).largeURI == uri) {
+                tracked = true;
+                break;
+            }
+        }
+        if (!tracked) {
+            QLOG_WARN() << "UIImageOverview :: Ignoring untracked attachment error" << uri << err;
+            return;
+        }
         if (err == 404 || err == 202) {
             // Server confirmed the attachment is gone. Keep a separate count:
             // a missing attachment must never be reported as downloaded.
