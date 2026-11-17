@@ -132,7 +132,17 @@ void applyTheme(const QString &name) {
         QStyle *lightStyle = QStyleFactory::create(originalStyleName);
         if (lightStyle)
             app->setStyle(lightStyle);
-        app->setPalette(originalPalette);
+        // Qt may merge unresolved Link/LinkVisited brushes from the previous
+        // application palette, even after setPalette(originalPalette). Force
+        // the original native hyperlink colours for all widget states.
+        QPalette lightPalette = originalPalette;
+        for (int group = QPalette::Active; group <= QPalette::Inactive; ++group) {
+            const QPalette::ColorGroup g = static_cast<QPalette::ColorGroup>(group);
+            lightPalette.setBrush(g, QPalette::Link, originalPalette.brush(g, QPalette::Link));
+            lightPalette.setBrush(g, QPalette::LinkVisited,
+                                  originalPalette.brush(g, QPalette::LinkVisited));
+        }
+        app->setPalette(lightPalette);
     }
 
     darkActive = wantDark;
