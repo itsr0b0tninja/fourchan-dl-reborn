@@ -57,7 +57,7 @@ void Updater::exchangeFinished(bool errors) {
 
     if (executable != "") {
         p("Starting Executable file "+executable);
-        QProcess::startDetached(QString("\"%1\"").arg(executable));
+        QProcess::startDetached(executable, QStringList(), QFileInfo(executable).absolutePath());
 
         ai->setFailedFiles(fh->getFailedFiles());
     }
