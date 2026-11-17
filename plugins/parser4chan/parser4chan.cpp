@@ -412,50 +412,35 @@ QList<QUrl> Parser4chan::initialRequests() {
 }
 
 QUrl Parser4chan::alterUrl(QUrl u){
-    // Function is only called for non-images!
-    // New URI format is http[s]://[..].4chan.org/<board>/thread/<threadnumber>[/threadtitle]
-    //  Adding .json only works when the threadtitle is ommitted from the uri
-    QString s_url;
-    QStringList sl;
+    // 4chan JSON API requests are hosted separately from image downloads.
+    const QString host = u.host().toLower();
+    if (host == "a.4cdn.org" || host == "i.4cdn.org")
+        return u;
 
-    s_url = u.toString();
-    s_url.replace("/res/", "/thread/");
+    const QStringList segments = u.path().split("/", QString::SkipEmptyParts);
+    if (segments.isEmpty())
+        return u;
 
-    if (!s_url.startsWith("http")) {
-        s_url.prepend("http://");
+    const QString board = segments.at(0);
+    QString apiPath;
+    if (segments.size() >= 3 &&
+            (segments.at(1) == "thread" || segments.at(1) == "res")) {
+        QString id = segments.at(2);
+        if (id.endsWith(".json")) id.chop(5);
+        if (!QRegExp("^\\d+$").exactMatch(id)) return u;
+        apiPath = QString("/%1/thread/%2.json").arg(board).arg(id);
+    } else {
+        QString page = segments.size() > 1 ? segments.at(1) : "1";
+        if (page.endsWith(".json")) page.chop(5);
+        if (!QRegExp("^\\d+$").exactMatch(page)) return u;
+        apiPath = QString("/%1/%2.json").arg(board).arg(page);
     }
 
-    if (s_url.endsWith("/")) s_url.remove(s_url.length()-1,1);
-
-    sl = s_url.split("/");
-    if (sl.count() == 4) {
-        // This is the first page of a board.
-        //  To get the .json append working we have to add "/1"
-        s_url.append("/1");
-    }
-    if (sl.contains("thread")) {
-        if (sl.count() == 7) {
-            sl.removeLast();
-            s_url = sl.join("/");
-        }
-    }
-    if (!s_url.endsWith(".json")) s_url.append(".json");   // Only get the JSON files
-
-    return QUrl(s_url);
-    /*QString sUrl;
-    QStringList sl;
-    sUrl = u.toString();
-
-    if (sUrl.endsWith("/")) sUrl.remove(sUrl.length()-1,1);
-    sl = sUrl.split("/");
-    if (sl.count() == 4) {
-        // This is the first page of a board.
-        //  To get the .json append working we have to add "/0"
-        sUrl.append("/0");
-    }
-    if (!sUrl.endsWith(".json")) sUrl.append(".json");   // Only get the JSON files
-
-    return QUrl(sUrl);*/
+    QUrl apiUrl;
+    apiUrl.setScheme("https");
+    apiUrl.setHost("a.4cdn.org");
+    apiUrl.setPath(apiPath);
+    return apiUrl;
 }
 
 #if QT_VERSION < 0x050000
