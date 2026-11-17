@@ -78,6 +78,7 @@ void RequestHandler::cancel(QUrl url) {
     foreach(qint64 id, uids) {
         if (requests.value(id) == url) {
             downloadManager->removeRequest(id);
+            requests.remove(id);
         }
     }
 }
@@ -89,5 +90,6 @@ void RequestHandler::cancelAll() {
 
     foreach(qint64 id, uids) {
         downloadManager->removeRequest(id);
+        requests.remove(id);
     }
 }

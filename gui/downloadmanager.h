@@ -58,6 +58,8 @@ private:
     int finishedRequests;
     int initialTimeout;
     int runningTimeout;
+    int maxRetries;
+    int retryDelaySeconds;
     bool downloadsPaused;
     int statistic_downloadedFiles;
     float statistic_downloadedKBytes;
@@ -67,6 +69,7 @@ private:
 
     void addRequest(qint64, DownloadRequest*);
     void handleError(qint64, QNetworkReply*);
+    void retryOrFail(qint64, const QString &, bool rateLimited=false);
     void reschedule(qint64);
     void processRequests();
     inline qint64 getUID() {return ++lastid;}
@@ -83,6 +86,7 @@ private slots:
     void startRequest(qint64);
     void replyError(QNetworkReply::NetworkError e) {QLOG_ERROR() << "DownloadManager :: reply error " << e;}
     void downloadTimeout(qint64);
+    void retryReady();
 
 signals:
     void totalRequestsChanged(int);

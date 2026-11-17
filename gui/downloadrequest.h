@@ -35,7 +35,7 @@ public:
     void pause(int s);
 
     int error_count() {return _error_count;}
-    void download_error(int increment=1);
+    void download_error(int increment=1, int delaySeconds=10);
 
 private:
     RequestHandler* _rh;
