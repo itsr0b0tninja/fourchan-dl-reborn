@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>4chan Downloader</string>
+   <string>4chan Downloader Reborn v0.1</string>
   </property>
   <property name="windowIcon">
    <iconset resource="resources.qrc">
