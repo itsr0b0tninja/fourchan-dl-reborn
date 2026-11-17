@@ -554,6 +554,32 @@
          </property>
         </widget>
        </item>
+       <item row="8" column="0">
+        <widget class="QLabel" name="labelMaxRetries">
+         <property name="text"><string>Automatic retries</string></property>
+        </widget>
+       </item>
+       <item row="8" column="1">
+        <widget class="QSpinBox" name="sbMaxRetries">
+         <property name="toolTip"><string>Retries after the first attempt. Zero disables automatic retries.</string></property>
+         <property name="maximum"><number>20</number></property>
+         <property name="value"><number>4</number></property>
+        </widget>
+       </item>
+       <item row="9" column="0">
+        <widget class="QLabel" name="labelRetryDelay">
+         <property name="text"><string>Base retry delay</string></property>
+        </widget>
+       </item>
+       <item row="9" column="1">
+        <widget class="QSpinBox" name="sbRetryDelay">
+         <property name="toolTip"><string>Delay increases after repeated errors; rate limits wait longer.</string></property>
+         <property name="minimum"><number>1</number></property>
+         <property name="maximum"><number>120</number></property>
+         <property name="value"><number>5</number></property>
+         <property name="suffix"><string> seconds</string></property>
+        </widget>
+       </item>
        <item row="3" column="0" colspan="2">
         <widget class="QCheckBox" name="cbKeepLocalHTMLCopy">
          <property name="text">
