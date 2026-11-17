@@ -53,6 +53,10 @@ jobs:
           qmake-qt5 updater.pro
           mingw32-make -j2
           popd
+          pushd ci
+          qmake-qt5 tls-smoke.pro
+          mingw32-make -j2
+          popd
           echo "Built executable files:"
           find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'
           cp -v 4chan-dl-reborn.exe portable/4chan-dl-reborn.exe
@@ -61,6 +65,7 @@ jobs:
           test -s portable/4chan-dl-reborn.exe
           test -s portable/plugins/parser4chan.dll
           test -s portable/updater/upd4t3r.exe
+          test -s portable/tls-smoke.exe
 
       - name: Bundle the Windows Qt runtime
         shell: msys2 {0}
@@ -94,22 +99,24 @@ jobs:
             copy_deps "$plugin" portable
           done
           copy_deps portable/updater/upd4t3r.exe portable/updater
-          # Qt5Network loads TLS providers at runtime, so their DLLs are
-          # explicitly included even though PE import walking cannot see them.
-          found_tls=0
-          for dll in /ucrt64/bin/libssl-*.dll /ucrt64/bin/libcrypto-*.dll; do
-            if test -s "$dll"; then
-              found_tls=1
-              cp -v "$dll" portable/
-              cp -v "$dll" portable/updater/
-              copy_deps "$dll" portable
-              copy_deps "$dll" portable/updater
-            fi
+          # MSYS2 updated OpenSSL to v4 while this Qt 5.15 build still
+          # dynamically looks for the ABI of OpenSSL v3. Bundle the older,
+          # signed MSYS2 package's v3 runtime DLLs beside the executable.
+          # Keep its SHA256 pinned to prevent a silent supply-chain change.
+          openssl3_pkg="mingw-w64-ucrt-x86_64-openssl-3.6.5-1-any.pkg.tar.zst"
+          curl -fLsS --retry 3 --retry-delay 2 \
+            "https://repo.msys2.org/mingw/ucrt64/$openssl3_pkg" \
+            -o "$openssl3_pkg"
+          printf '%s  %s\\n' \
+            '773e021ebad83f14b5c103db467411e8ff064663e1c7e7f730e2be72f4117064' \
+            "$openssl3_pkg" | sha256sum -c -
+          for dll in libssl-3-x64.dll libcrypto-3-x64.dll; do
+            bsdtar -xOf "$openssl3_pkg" "ucrt64/bin/$dll" > "portable/$dll"
+            test -s "portable/$dll"
+            cp -v "portable/$dll" portable/updater/
+            copy_deps "portable/$dll" portable
+            copy_deps "portable/updater/$dll" portable/updater
           done
-          if test "$found_tls" -eq 0; then
-            echo "No OpenSSL runtime DLLs found in /ucrt64/bin" >&2
-            exit 1
-          fi
           cp LICENSE portable/LICENSE.txt
           printf '%s\n' \
             '4chan Downloader Reborn v0.1 - portable Windows 64-bit' \
@@ -122,10 +129,23 @@ jobs:
           test -s portable/Qt5Core.dll
           test -s portable/Qt5Network.dll
           test -s portable/updater/Qt5Network.dll
-          compgen -G 'portable/libssl-*.dll' >/dev/null
-          compgen -G 'portable/updater/libssl-*.dll' >/dev/null
-          compgen -G 'portable/libcrypto-*.dll' >/dev/null
+          test -s portable/libssl-3-x64.dll
+          test -s portable/libcrypto-3-x64.dll
+          test -s portable/updater/libssl-3-x64.dll
+          test -s portable/updater/libcrypto-3-x64.dll
           find portable -maxdepth 2 -type f | sort
+
+      - name: Verify bundled SSL is functional on Windows
+        shell: pwsh
+        run: |
+          # Prevent GitHub's build tools from masking missing bundled DLLs.
+          $root = (Resolve-Path 'portable').Path
+          $env:PATH = "$root;$env:SystemRoot\\System32;$env:SystemRoot"
+          & "$root\\tls-smoke.exe"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Portable Qt TLS smoke test failed (exit code $LASTEXITCODE)."
+          }
+          Remove-Item "$root\\tls-smoke.exe"
 
       - name: Create downloadable portable ZIP
         shell: pwsh
