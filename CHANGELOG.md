@@ -1,8 +1,16 @@
 # Changelog — 4chan Downloader Reborn
 
-## v0.2.0 — In development (not yet released)
-- Download-reliability changes under development: bounded retries, clearer error categories, failed/missing attachment counts, a Retry Failed action, and file-size validation.
-- Pending compilation, Windows testing, and confirmation before publishing.
+## v0.2.1 — Release
+- Write attachments progressively to atomic temporary files rather than retaining entire media bodies in RAM; verify expected byte counts before committing.
+- Index known attachment URLs and original filenames and avoid repeated full-list scans while queuing attachments and rescanning threads.
+- Speed up case-insensitive blacklist lookups and pace periodic HEAD cleanup checks, avoiding a large startup burst.
+- Defer download queue processing until request handlers have registered IDs; batch bursts of restored requests.
+- Add a Windows CI smoke test covering progressive writes, interrupted file cleanup, atomic completion, and retry counters.
+- No redesign of the existing interface.
+
+## v0.2.0 — Released and tested on Windows
+- Bounded retries, clearer error categories, failed/missing attachment counts, a Retry Failed action, and file-size validation.
+- User confirmed that the new failure reporting worked after resuming 30+ monitored threads following the update.
 
 ## v0.1.1 — Released
 - In-program update test from v0.1 successfully confirmed by the project owner.
