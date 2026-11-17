@@ -6,6 +6,7 @@ ThumbnailCreator::ThumbnailCreator(QObject *parent) :
     iconSize = new QSize(100,100);
     hq = true;
     newImages = false;
+    stopping = false;
     settings = new QSettings("settings.ini", QSettings::IniFormat);
     halted = false;
     use_combined_thumbnail_list = false;
@@ -32,6 +33,10 @@ void ThumbnailCreator::go() {
 
     forever {
         mutex.lock();
+            if (stopping) {
+                mutex.unlock();
+                break;
+            }
             if (list.count()>0 && !halted) {
                 currentFilename = list.front();
                 list.pop_front();
@@ -211,6 +216,14 @@ void ThumbnailCreator::eventEmitTimerTriggered() {
 //        emit thumbnailsAvailable(rendered_thumbnails.join(";;;"));
         rendered_thumbnails.clear();
     }
+    mutex.unlock();
+}
+
+void ThumbnailCreator::requestStop() {
+    mutex.lock();
+    stopping = true;
+    list.clear();
+    condition.wakeAll();
     mutex.unlock();
 }
 
