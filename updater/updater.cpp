@@ -1,4 +1,5 @@
 #include "updater.h"
+#include <QFileInfo>
 
 Updater::Updater(QObject *parent) :
     QObject(parent)
@@ -52,7 +53,7 @@ void Updater::startExchange(bool applicationClosed) {
 void Updater::exchangeFinished(bool errors) {
     p("Update process finished");
     if (errors) {
-        ai->sendError("Update finished with errors.");
+        ai->sendError("Update failed; rollback attempted. Please check update.log.");
     }
 
     if (executable != "") {
@@ -66,7 +67,7 @@ void Updater::exchangeFinished(bool errors) {
     }
 
     ai->setUpdateFinished(true);
-    ai->sendMessage("Update finished.");
+    if (!errors) ai->sendMessage("Update installed.");
 }
 
 void Updater::setExecutable(QString s) {
