@@ -777,7 +777,16 @@ void UIImageOverview::createSupervisedDownload(QUrl url) {
             url = iParser->alterUrl(url);
             QLOG_DEBUG() << Q_FUNC_INFO << "URL altered to " << url.toString();
         }
-        requestHandler->request(url);
+        qint64 expectedSize = 0;
+        if (isImage(url)) {
+            for (int i=0; i<images.count(); ++i) {
+                if (images.at(i).largeURI == url.toString()) {
+                    expectedSize = images.at(i).expectedSize;
+                    break;
+                }
+            }
+        }
+        requestHandler->request(url, -1, expectedSize);
     }
 }
 
