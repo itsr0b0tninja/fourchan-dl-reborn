@@ -1,6 +1,21 @@
 ﻿#include "uiimageoverview.h"
 #include "ui_uiimageoverview.h"
 
+// Convert saved legacy 4chan links to the canonical displayed thread URL.
+static QString canonical4chanThreadUrl(const QString &text) {
+    QUrl url(text);
+    QString host = url.host().toLower();
+    if (host != "boards.4chan.org" && host != "boards.4channel.org")
+        return text;
+    QString path = url.path();
+    QRegExp oldThread("^(/[^/]+)/res/(\\d+)");
+    if (oldThread.indexIn(path) != 0)
+        return text;
+    path.replace(oldThread, "\\1/thread/\\2");
+    url.setPath(path);
+    return url.toString();
+}
+
 UIImageOverview::UIImageOverview(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::UIImageOverview)
@@ -129,6 +144,8 @@ void UIImageOverview::start(void) {
                 s.prepend("http://");
                 ui->leURI->setText(s);
             }
+
+            ui->leURI->setText(canonical4chanThreadUrl(ui->leURI->text()));
 
             // Check if we can parse this URI
             if (selectParser()) {
@@ -442,6 +459,27 @@ void UIImageOverview::errorHandler(QUrl url, int err) {
         }
         break;
 
+    case 503:
+        if (isImage(url)) {
+            for (int i = 0; i < images.count(); ++i) {
+                if (images.at(i).largeURI == url.toString()) {
+                    _IMAGE tmp = images.at(i);
+                    tmp.requested = false;
+                    tmp.downloaded = false;
+                    images.replace(i, tmp);
+                    failedImageUrls.insert(url.toString());
+                    break;
+                }
+            }
+            updateDownloadStatus();
+            emit errorMessage("Download failed after retries: " + url.toString());
+        } else {
+            setTabTitle("Thread request failed");
+            setStatus("Thread request failed; retry at next rescan");
+            emit errorMessage("Thread request failed: " + url.toString());
+        }
+        break;
+
     case 999:
         setTabTitle("Banned");
         emit errorMessage("You are banned");
@@ -513,7 +551,7 @@ void UIImageOverview::setValues(QString s) {
 
     list = s.split(";;");
 
-    ui->leURI->setText(list.at(0));
+    ui->leURI->setText(canonical4chanThreadUrl(list.at(0)));
     ui->leSavepath->setText(list.at(1));
 
     cbIndex = ui->comboBox->findData(list.at(3));
@@ -842,15 +880,21 @@ void UIImageOverview::processRequestResponse(QUrl url, QByteArray ba, bool cache
                     }
                 }
 
-                f.open(QIODevice::ReadWrite);
-                bytesWritten = f.write(ba);
-                f.close();
+                bytesWritten = -1;
+                bool flushed = false;
+                if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                    bytesWritten = f.write(ba);
+                    flushed = f.flush();
+                    f.close();
+                }
 
-                if (bytesWritten == ba.size()) {
+                if (bytesWritten == ba.size() && bytesWritten > 0 && flushed) {
                     createThumbnail(f.fileName());
                     setCompleted(requestURI, f.fileName());
                 }
                 else {
+                    f.remove();
+                    errorHandler(url, 503);
                     QLOG_ERROR() << "UIImageOverview :: Couldn't save file from URI " << url.toString();
                 }
             }
@@ -948,6 +992,7 @@ void UIImageOverview::setCompleted(QString uri, QString filename) {
             tmp = images.at(i);
             tmp.downloaded = true;
             tmp.savedAs = filename;
+            failedImageUrls.remove(uri);
 
             images.replace(i,tmp);
 
@@ -1047,7 +1092,8 @@ void UIImageOverview::mergeImageList(QList<_IMAGE> list) {
             imagesAdded = true;
     }
 
-    if (imagesAdded) {
+    if (imagesAdded || !failedImageUrls.isEmpty()) {
+        failedImageUrls.clear();
         download(true);
     }
     else {
@@ -1168,8 +1214,13 @@ void UIImageOverview::updateDownloadStatus() {
 //    updateExpectedThumbnailCount();
 
     if (!isDownloadFinished()) {
-        setTabTitle(QString("%1/%2").arg(d).arg(t));
-        setStatus("downloading");
+        if (!failedImageUrls.isEmpty()) {
+            setTabTitle(QString("Incomplete %1/%2 (%3 failed)").arg(d).arg(t).arg(failedImageUrls.size()));
+            setStatus("Incomplete; will retry on the next thread rescan");
+        } else {
+            setTabTitle(QString("%1/%2").arg(d).arg(t));
+            setStatus("downloading");
+        }
         ui->progressBar->setVisible(true);
         ui->progressBar->setValue(d);
         ui->progressBar->setMaximum(t);
