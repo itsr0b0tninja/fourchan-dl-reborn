@@ -2,6 +2,7 @@
 #define DOWNLOADREQUEST_H
 
 #include <QObject>
+#include <QSaveFile>
 #include "requesthandler.h"
 
 class RequestHandler;
@@ -20,6 +21,16 @@ public:
 
     void setPriority(int prio) {_prio = prio;}
     int priority() {return _prio;}
+
+    QString savePath() const {return _savePath;}
+    void setSavePath(const QString &path) {_savePath = path;}
+    bool hasFileDestination() const {return !_savePath.isEmpty();}
+    bool beginStreaming();
+    bool appendStreaming(const QByteArray &bytes);
+    bool commitStreaming();
+    void abortStreaming();
+    bool streamFailed() const {return _streamFailed;}
+    qint64 streamedBytes() const {return _streamedBytes;}
 
     QByteArray response(void) {return _response;}
     void setResponse(QByteArray ba);
@@ -45,6 +56,10 @@ private:
     QUrl _url;
     int _prio;
     QByteArray _response;
+    QString _savePath;
+    QSaveFile* _streamFile;
+    qint64 _streamedBytes;
+    bool _streamFailed;
     QTimer* pauseTimer;
     bool _processing;
     bool _finished;
