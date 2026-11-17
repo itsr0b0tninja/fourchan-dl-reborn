@@ -96,12 +96,12 @@ jobs:
           copy_deps portable/updater/upd4t3r.exe portable/updater
           # Qt5Network loads TLS providers at runtime, so their DLLs are
           # explicitly included even though PE import walking cannot see them.
-          for dll in libssl-3-x64.dll libcrypto-3-x64.dll; do
-            test -s "/ucrt64/bin/$dll"
-            cp -v "/ucrt64/bin/$dll" portable/
-            cp -v "/ucrt64/bin/$dll" portable/updater/
-            copy_deps "/ucrt64/bin/$dll" portable
-            copy_deps "/ucrt64/bin/$dll" portable/updater
+          for dll in /ucrt64/bin/libssl-*-x64.dll /ucrt64/bin/libcrypto-*-x64.dll; do
+            test -s "$dll"
+            cp -v "$dll" portable/
+            cp -v "$dll" portable/updater/
+            copy_deps "$dll" portable
+            copy_deps "$dll" portable/updater
           done
           cp LICENSE portable/LICENSE.txt
           printf '%s\n' \
@@ -115,8 +115,9 @@ jobs:
           test -s portable/Qt5Core.dll
           test -s portable/Qt5Network.dll
           test -s portable/updater/Qt5Network.dll
-          test -s portable/libssl-3-x64.dll
-          test -s portable/updater/libssl-3-x64.dll
+          compgen -G 'portable/libssl-*-x64.dll' >/dev/null
+          compgen -G 'portable/updater/libssl-*-x64.dll' >/dev/null
+          compgen -G 'portable/libcrypto-*-x64.dll' >/dev/null
           find portable -maxdepth 2 -type f | sort
 
       - name: Create downloadable portable ZIP
