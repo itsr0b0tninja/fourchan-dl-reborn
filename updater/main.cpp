@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     QCoreApplication a(argc, argv);
     output = new QTextStream(stdout);
 
-    settings = new QSettings("../settings.ini", QSettings::IniFormat);
+    settings = new QSettings(QCoreApplication::applicationDirPath() + "/../settings.ini", QSettings::IniFormat);
 
     QFile f;
 
