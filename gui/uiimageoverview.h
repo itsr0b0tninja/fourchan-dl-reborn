@@ -8,6 +8,7 @@
 #include <QDesktopServices>
 #include <QStyle>
 #include <QSettings>
+#include <QSet>
 #include <QImage>
 #include <QCloseEvent>
 #include <QThread>
@@ -64,6 +65,7 @@ private:
     QTimer* thumbnailCheckTimer;
     QList<int> timeoutValues;
     QList<_IMAGE> images;
+    QSet<QString> failedImageUrls;
     QSize iconSize;
     QAction* deleteFileAction;
     QAction* reloadFileAction;
