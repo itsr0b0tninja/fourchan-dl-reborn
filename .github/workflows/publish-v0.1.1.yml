@@ -1,0 +1,70 @@
+name: Publish v0.1.1 in-program updater test
+
+on:
+  push:
+    branches: [development/v0.1-foundation]
+    paths:
+      - '.github/workflows/publish-v0.1.1.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish v0.1.1 from successful validated Windows build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.1.1 --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "v0.1.1 already published; not replacing any release."
+            exit 0
+          fi
+          mkdir -p portable
+          gh run download 44131969643 --repo "$GH_REPO" \
+            --name 4chan-dl-reborn-win64-portable --dir portable
+          test -s portable/4chan-dl-reborn.exe
+          test -s portable/plugins/parser4chan.dll
+          test -s portable/updater/upd4t3r.exe
+          test -s portable/libssl-3-x64.dll
+          test -s portable/platforms/qwindows.dll
+          (cd portable && zip -qr ../4chan-dl-reborn-win64-portable.zip .)
+          cat > webupdate.xml <<'EOF'
+          <updates>
+          <win32-qt5>
+          <file name="4chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="0.1.1" source="https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/download/v0.1.1/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
+          <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="0.1.1" source="https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/download/v0.1.1/parser4chan.dll" target="plugins/parser4chan.dll" />
+          </win32-qt5>
+          </updates>
+          EOF
+          cat > RELEASE-NOTES.txt <<'EOF'
+          4chan Downloader Reborn v0.1.1 — Updater verification
+
+          Minimal upgrade from v0.1: application and parser version bumps,
+          consistent version-number handling, and graceful shutdown on a
+          subsequent in-program update.
+
+          This is intended to test the update flow from the existing portable
+          v0.1 installation. Keep a backup of the working v0.1 folder until
+          the update has been verified on Windows.
+
+          The full portable ZIP remains available as a fallback.
+          EOF
+          sha256sum portable/4chan-dl-reborn.exe portable/plugins/parser4chan.dll \
+            portable/updater/upd4t3r.exe > SHA256SUMS.txt
+          gh release create v0.1.1 \
+            --repo "$GH_REPO" \
+            --target 75a6912ba644f81a46447f40494e8a517ae4bdd5 \
+            --title "4chan Downloader Reborn v0.1.1 — Updater Test" \
+            --notes-file RELEASE-NOTES.txt \
+            4chan-dl-reborn-win64-portable.zip \
+            portable/4chan-dl-reborn.exe \
+            portable/plugins/parser4chan.dll \
+            portable/updater/upd4t3r.exe \
+            webupdate.xml SHA256SUMS.txt
+          gh release view v0.1.1 --repo "$GH_REPO"
