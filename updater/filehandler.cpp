@@ -5,65 +5,80 @@ FileHandler::FileHandler(QObject *parent) :
 {
 }
 
-void FileHandler::startExchange(QList<FileUpdate> l) {
-    //bool filesRemaining;
-    bool errors;
-    QString sourceFilename;
-    QString targetFilename;
-    FileUpdate fu;
+void FileHandler::startExchange(QList<FileUpdate> updates) {
+    // Stage all replacements. Never delete an installed application file
+    // before we have both a verified temporary file and a recoverable backup.
+    updateList = updates;
+    bool errors = false;
+    QList<QString> installedTargets;
+    QMap<QString,QString> backups;
 
-    updateList = l;
-    errors = false;
-
-    //filesRemaining = false;
-
-    for (int i=0; i<updateList.count(); i++) {
-            sourceFilename = updateList.at(i).tmpFilename;
-            targetFilename = updateList.at(i).filename;
-
-        p("Exchanging "+sourceFilename+" with "+targetFilename);
-
-        QFile source;
-        QFile target;
-
-        source.setFileName(sourceFilename);
-        target.setFileName(targetFilename);
-
-        source.open(QIODevice::ReadWrite);
-
-        if (target.exists()) {
-            if  (!target.remove()) {
-                p("Cannot remove "+targetFilename);
-                error("Cannot remove "+targetFilename+" ("+target.errorString()+")");
-
-                fu.tmpFilename = sourceFilename;
-                fu.filename = targetFilename;
-                failedFiles.append(fu);
-                errors = true;
-            }
-        }
-
-        if (!source.rename(targetFilename)) {
-            p("Could not rename "+sourceFilename+" to "+targetFilename);
-            error("Could not rename "+sourceFilename+" to "+targetFilename+" ("+target.errorString()+")");
-
-            fu.tmpFilename = sourceFilename;
-            fu.filename = targetFilename;
-            failedFiles.append(fu);
-
+    for (int i = 0; i < updateList.count(); ++i) {
+        const FileUpdate& item = updateList.at(i);
+        const QFileInfo downloaded(item.tmpFilename);
+        if (item.tmpFilename.isEmpty() || !downloaded.isFile() || downloaded.size() == 0) {
+            p("Missing or empty update file for " + item.filename);
+            emit error("Downloaded update is missing: " + item.filename);
             errors = true;
+            break;
         }
-
-#ifdef Q_OS_LINUX
-        // On Linux we have to set executable rights
-        target.setPermissions(target.permissions() | QFile::ExeOther);
-#endif
-
+        if (QFileInfo(item.filename).isDir()) {
+            emit error("Update destination is a directory: " + item.filename);
+            errors = true;
+            break;
+        }
+        const QString parent = QFileInfo(item.filename).absolutePath();
+        if (!QDir(parent).exists()) {
+            emit error("Update destination directory is missing: " + parent);
+            errors = true;
+            break;
+        }
     }
 
-    if (errors) p("Rename had errors");
+    if (!errors) {
+        for (int i = 0; i < updateList.count(); ++i) {
+            const FileUpdate& item = updateList.at(i);
+            const QString target = item.filename;
+            const QString backup = target + ".reborn-backup-" +
+                QUuid::createUuid().toString().remove("{").remove("}");
+            if (QFile::exists(target)) {
+                if (!QFile::rename(target, backup)) {
+                    p("Unable to back up " + target);
+                    emit error("Could not back up " + target);
+                    errors = true;
+                    break;
+                }
+                backups.insert(target, backup);
+            }
+            if (!QFile::rename(item.tmpFilename, target)) {
+                p("Unable to install " + target);
+                emit error("Could not install " + target);
+                errors = true;
+                break;
+            }
+            installedTargets.append(target);
+        }
+    }
 
-    p("Updating finished - If this window doesn't close it save to close it manually.");
+    if (errors) {
+        // Roll back every replacement already applied, including any target
+        // whose previous file was moved before its new file could be installed.
+        for (int i = installedTargets.count()-1; i >= 0; --i)
+            QFile::remove(installedTargets.at(i));
+        QMap<QString,QString>::const_iterator it = backups.constBegin();
+        for (; it != backups.constEnd(); ++it) {
+            if (!QFile::rename(it.value(), it.key())) {
+                p("RESTORE FAILED: " + it.key() + " (backup at " + it.value() + ")");
+                emit error("Restore failed. Backup retained: " + it.value());
+            }
+        }
+    } else {
+        QMap<QString,QString>::const_iterator it = backups.constBegin();
+        for (; it != backups.constEnd(); ++it)
+            QFile::remove(it.value());
+    }
+
+    p(errors ? "Update failed; rollback attempted" : "Update installed");
     emit exchangingFinished(errors);
 }
 
