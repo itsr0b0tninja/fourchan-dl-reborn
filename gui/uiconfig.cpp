@@ -146,7 +146,9 @@ void UIConfig::loadSettings(void) {
     settings->beginGroup("download_manager");
         ui->sbConcurrentDownloads->setValue(settings->value("concurrent_downloads",20).toInt());
         ui->sbDownloadTimeoutInitial->setValue(settings->value("initial_timeout",30).toInt());
-        ui->sbDownloadTimeoutInbetween->setValue(settings->value("running_timeout",2).toInt());
+        ui->sbDownloadTimeoutInbetween->setValue(settings->value("running_timeout",20).toInt());
+        ui->sbMaxRetries->setValue(settings->value("max_retries",4).toInt());
+        ui->sbRetryDelay->setValue(settings->value("retry_delay_seconds",5).toInt());
         ui->cbKeepLocalHTMLCopy->setChecked(settings->value("use_thread_cache", false).toBool());
         ui->leThreadCachePath->setText(settings->value("thread_cache_path", QString("%1/%2").arg(QCoreApplication::applicationDirPath())
                                                        .arg("thread-cache")).toString());
@@ -220,6 +222,8 @@ void UIConfig::accept(void) {
         settings->setValue("concurrent_downloads", ui->sbConcurrentDownloads->value());
         settings->setValue("initial_timeout", ui->sbDownloadTimeoutInitial->value());
         settings->setValue("running_timeout", ui->sbDownloadTimeoutInbetween->value());
+        settings->setValue("max_retries", ui->sbMaxRetries->value());
+        settings->setValue("retry_delay_seconds", ui->sbRetryDelay->value());
         settings->setValue("use_thread_cache", ui->cbKeepLocalHTMLCopy->isChecked());
         settings->setValue("thread_cache_path", ui->leThreadCachePath->text());
         settings->setValue("user-agent", ui->leUserAgent->text());
