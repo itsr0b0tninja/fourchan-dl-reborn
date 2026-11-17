@@ -7,6 +7,7 @@
 
 #include <QFile>
 #include <QDateTime>
+#include <QSslSocket>
 #include <QThread>
 #include "mainwindow.h"
 #include "downloadmanager.h"
@@ -79,6 +80,9 @@ int main(int argc, char *argv[])
 
     QLOG_INFO() << "APP :: Program started";
     QLOG_INFO() << "APP :: Built with Qt" << QT_VERSION_STR << "running on" << qVersion();
+    QLOG_INFO() << "APP :: Qt SSL library build:" << QSslSocket::sslLibraryBuildVersionString();
+    QLOG_INFO() << "APP :: SSL runtime:" << QSslSocket::sslLibraryVersionString();
+    QLOG_INFO() << "APP :: TLS available:" << QSslSocket::supportsSsl();
 
     checkEnvironment();
     downloadManager = new DownloadManager();
