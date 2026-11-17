@@ -10,6 +10,7 @@ DownloadRequest::DownloadRequest(QObject *parent) :
 
     _paused = false;
     _error_count = 0;
+    _expected_size = 0;
     reset();
     _url = QUrl("");
     _prio = 0;
