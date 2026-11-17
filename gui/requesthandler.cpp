@@ -9,7 +9,7 @@ RequestHandler::RequestHandler(QObject *parent) :
     }
 }
 
-void RequestHandler::request(QUrl u, int priority, qint64 expectedSize) {
+void RequestHandler::request(QUrl u, int priority, qint64 expectedSize, QString savePath) {
     qint64 uid;
     int prio;
     QString sUrl;
@@ -30,7 +30,7 @@ void RequestHandler::request(QUrl u, int priority, qint64 expectedSize) {
     }
 
     if (downloadManager != 0) {
-        uid = downloadManager->requestDownload(this, u, prio, expectedSize);
+        uid = downloadManager->requestDownload(this, u, prio, expectedSize, savePath);
         QLOG_TRACE() << "RequestHandler :: Adding request" << uid << ":" << u.toString() << "prio" <<prio;
         requests.insert(uid, u);
     }
@@ -48,7 +48,7 @@ void RequestHandler::requestFinished(qint64 uid) {
 
     QLOG_TRACE() << "RequestHandler :: Request " << uid << " finished";
     ba = downloadManager->getByteArray(uid);
-    QLOG_TRACE() << "RequestHandler :: " << QString(ba);
+    QLOG_TRACE() << "RequestHandler :: received" << ba.size() << "bytes";
 
     cachedReply = downloadManager->cached(uid);
 
@@ -58,6 +58,14 @@ void RequestHandler::requestFinished(qint64 uid) {
     downloadManager->freeRequest(uid);
 
     emit response(url, ba, cachedReply);
+}
+
+void RequestHandler::requestFileFinished(qint64 uid) {
+    const QUrl url = requests.value(uid, QUrl("NONE"));
+    const QString path = downloadManager->getSavePath(uid);
+    requests.remove(uid);
+    downloadManager->freeRequest(uid);
+    emit responseFile(url, path);
 }
 
 void RequestHandler::error(qint64 req, int err) {
