@@ -54,9 +54,10 @@ void ApplicationUpdateInterface::processCommand(QByteArray a) {
         break;
     case PONG:
         if (pinging)
-            pinging=false;
+            pinging = false;
         else
             writeCommand(ERROR_CMD);
+        break;
 
     case CLOSE_REQUEST:
         exit(0);
