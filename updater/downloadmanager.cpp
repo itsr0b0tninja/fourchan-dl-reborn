@@ -13,71 +13,81 @@ DownloadManager::DownloadManager(QObject *parent) :
 }
 
 void DownloadManager::replyFinished(QNetworkReply* r) {
-    QString requestURI;
-    QString tmpFilename;
-    QUuid uuid;
-    QFile f;
+    const QString requestURI = r->request().url().toString();
+    const QString location = r->header(QNetworkRequest::LocationHeader).toString();
 
-    if (r->bytesAvailable() < r->header(QNetworkRequest::ContentLengthHeader).toLongLong()) {
-//        p(QString("Received only partial data of %1. Reinitiating download.").arg(r->url().toString()));
-
-        manager->get(QNetworkRequest(r->url()));
-        r->deleteLater();
-    }
-    else {
-        if (r->isFinished()) {
-            QString mimeType;
-            QString redirectTo;
-
-            redirectTo = r->header(QNetworkRequest::LocationHeader).toString();
-            mimeType = r->header(QNetworkRequest::ContentTypeHeader).toString();
-            requestURI = r->request().url().toString();
-
-            if (redirectTo != "") {
-                FileUpdate fu;
-                for (int i=0; i<updateList.count(); i++) {
-                    if (updateList.at(i).uri == requestURI) {
-                        fu = updateList.at(i);
-                        fu.uri = redirectTo;
-                        updateList.replace(i, fu);
-
-                        break;
-                    }
-                }
-
-                p("Following redirect to "+redirectTo);
-                initiateDownload();
-            }
-            else if (mimeType.startsWith("text/html")) {
-                p("Received HTML content. Don't know what to do.");
-                emit error("There is a problem downloading " + r->url().toString() + ". Exiting.");
-                exit(1);
-            }
-            else {
-                p("Finished download "+requestURI);
-                tmpFilename = uuid.createUuid().toString()+".file";
-
-                f.setFileName(tmpFilename);
-                f.open(QIODevice::ReadWrite);
-                f.write(r->readAll());
-                f.close();
-                p("Saved as "+tmpFilename);
-
-                for (int i=0; i<updateList.count(); i++) {
-                    if (updateList.at(i).uri == requestURI) {
-                        FileUpdate fu;
-
-                        fu = updateList.at(i);
-                        fu.tmpFilename = tmpFilename;
-
-                        updateList.replace(i, fu);
-                        break;
-                    }
-                }
-                initiateDownload();
+    if (!location.isEmpty()) {
+        // GitHub Releases redirects through its asset CDN.
+        const QString resolved = r->url().resolved(QUrl(location)).toString();
+        for (int i = 0; i < updateList.count(); ++i) {
+            if (updateList.at(i).uri == requestURI) {
+                FileUpdate next = updateList.at(i);
+                next.uri = resolved;
+                updateList.replace(i, next);
+                break;
             }
         }
+        r->deleteLater();
+        initiateDownload();
+        return;
     }
+
+    if (r->error() != QNetworkReply::NoError) {
+        emit error("GitHub update download failed: " + requestURI + " (" + r->errorString() + ")");
+        r->deleteLater();
+        return;
+    }
+
+    const QByteArray body = r->readAll();
+    const QVariant sizeHeader = r->header(QNetworkRequest::ContentLengthHeader);
+    if (sizeHeader.isValid() && sizeHeader.toLongLong() >= 0 &&
+        body.size() != sizeHeader.toLongLong()) {
+        emit error("Incomplete GitHub update download: " + requestURI);
+        r->deleteLater();
+        return;
+    }
+    if (body.isEmpty() ||
+        r->header(QNetworkRequest::ContentTypeHeader).toString().startsWith("text/html")) {
+        emit error("Invalid GitHub release file: " + requestURI);
+        r->deleteLater();
+        return;
+    }
+
+    const QString temporary = QUuid::createUuid().toString() + ".file";
+    QFile file(temporary);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        emit error("Cannot save updater temporary file: " + temporary);
+        r->deleteLater();
+        return;
+    }
+    const qint64 written = file.write(body);
+    const bool flushed = file.flush();
+    file.close();
+    if (written != body.size() || !flushed) {
+        QFile::remove(temporary);
+        emit error("Cannot finish writing updater temporary file: " + temporary);
+        r->deleteLater();
+        return;
+    }
+
+    bool found = false;
+    for (int i = 0; i < updateList.count(); ++i) {
+        if (updateList.at(i).uri == requestURI) {
+            FileUpdate updated = updateList.at(i);
+            updated.tmpFilename = temporary;
+            updateList.replace(i, updated);
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        QFile::remove(temporary);
+        emit error("Update request no longer matches the manifest: " + requestURI);
+        r->deleteLater();
+        return;
+    }
+    r->deleteLater();
+    initiateDownload();
 }
 
 void DownloadManager::startDownload(QList<FileUpdate> l) {
