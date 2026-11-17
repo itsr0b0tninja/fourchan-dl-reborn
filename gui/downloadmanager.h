@@ -21,10 +21,11 @@ class DownloadManager : public QObject
 public:
     explicit DownloadManager(QObject *parent = 0);
     QByteArray getByteArray(qint64);
+    QString getSavePath(qint64 uid) const;
     bool cached(qint64);
     void freeRequest(qint64);
     void removeRequest(qint64);
-    qint64 requestDownload(RequestHandler* caller, QUrl url, int prio=0, qint64 expectedSize=0);
+    qint64 requestDownload(RequestHandler* caller, QUrl url, int prio=0, qint64 expectedSize=0, QString savePath=QString());
     void getStatistics(int* files, float* kbytes);
     int getPendingRequests();
     int getRunningRequests();
@@ -83,6 +84,7 @@ private:
 
 private slots:
     void replyFinished(QNetworkReply*);
+    void streamReplyData();
     void startRequest(qint64);
     void replyError(QNetworkReply::NetworkError e) {QLOG_ERROR() << "DownloadManager :: reply error " << e;}
     void downloadTimeout(qint64);
