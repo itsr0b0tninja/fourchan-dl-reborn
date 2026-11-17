@@ -1,4 +1,5 @@
 ﻿#include "downloadmanager.h"
+#include "fourchanrequestheaders.h"
 
 #define MAX_CONCURRENT_DOWNLOADS_PER_NAM 5
 
@@ -348,8 +349,14 @@ void DownloadManager::startRequest(qint64 uid) {
 
         req = QNetworkRequest(dr->url());
         req.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Automatic);
-        req.setRawHeader("User-Agent", settings->value("options/user-agent", "Wget/1.12").toString().toLatin1());
-//        req.setRawHeader("User-Agent", "Opera/9.80 (Windows NT 6.1; U; en) Presto/2.9.168 Version/11.50");
+        const QByteArray configuredAgent = settings->value("download_manager/user-agent",
+            QString::fromLatin1(FourchanRequestHeaders::defaultUserAgent())).toString().toLatin1();
+        FourchanRequestHeaders::apply(req, dr->url(), configuredAgent);
+        if (FourchanRequestHeaders::isFourchanVideo(dr->url())) {
+            QLOG_DEBUG() << "DownloadManager :: Browser-style 4chan video request"
+                         << dr->url() << "Range:" << req.rawHeader("Range")
+                         << "Referer:" << req.rawHeader("Referer");
+        }
         currentRequests++;
         nam = getFreeNAM();
         rep = nam->get(req);
@@ -392,7 +399,14 @@ void DownloadManager::handleError(qint64 uid, QNetworkReply* reply) {
         return;
     }
 
-    // 429 is a rate limit, not missing media. Do not permanently blacklist.
+    // 429 is a server rejection, not proof that media is deleted.
+    // Keep Retry Failed available; report video-specific response details so
+    // a repeated browser-only failure can be diagnosed without guessing.
+    if (httpCode == 429 && FourchanRequestHeaders::isFourchanVideo(reply->url())) {
+        QLOG_WARN() << "DownloadManager :: Video CDN returned HTTP 429"
+                    << "Retry-After:" << reply->rawHeader("Retry-After")
+                    << "Content-Type:" << reply->header(QNetworkRequest::ContentTypeHeader).toString();
+    }
     retryOrFail(uid, reply->errorString(), httpCode == 429);
 }
 
