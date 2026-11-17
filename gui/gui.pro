@@ -6,7 +6,7 @@
 
 QT       += core gui widgets network
 
-win32:TARGET = ../../fourchan-dl
+win32:TARGET = ../../4chan-dl-reborn
 else:TARGET = ../fourchan-dl
 
 TEMPLATE = app
