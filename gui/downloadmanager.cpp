@@ -13,7 +13,7 @@ DownloadManager::DownloadManager(QObject *parent) :
     nams.at(0)->setCookieJar(cookies);
     settings = new QSettings("settings.ini", QSettings::IniFormat);
 
-    waitTimer = new QTimer();
+    waitTimer = new QTimer(this);
     waitTimer->setSingleShot(true);
     waitTimer->setInterval(20000);
 
@@ -40,7 +40,7 @@ DownloadManager::DownloadManager(QObject *parent) :
 
 void DownloadManager::loadSettings() {
     settings->beginGroup("download_manager");
-        maxRequests = settings->value("concurrent_downloads", 20).toInt();
+        maxRequests = qBound(1, settings->value("concurrent_downloads", 20).toInt(), 99);
         initialTimeout = settings->value("initial_timeout", 30).toInt()*1000;
         runningTimeout = settings->value("running_timeout", 20).toInt()*1000;
         _useThreadCache = settings->value("use_thread_cache", false).toBool();
@@ -54,7 +54,7 @@ void DownloadManager::loadSettings() {
         statistic_downloadedKBytes = settings->value("downloaded_kbytes", 0).toFloat();
     settings->endGroup();
 
-    setupNetworkAccessManagers(qCeil(maxRequests/MAX_CONCURRENT_DOWNLOADS_PER_NAM));
+    setupNetworkAccessManagers((maxRequests + MAX_CONCURRENT_DOWNLOADS_PER_NAM - 1) / MAX_CONCURRENT_DOWNLOADS_PER_NAM);
 }
 
 void DownloadManager::replyFinished(QNetworkReply* reply) {
@@ -436,7 +436,7 @@ NetworkAccessManager* DownloadManager::getFreeNAM() {
 }
 
 void DownloadManager::setupNetworkAccessManagers(int count) {
-    for (int i=1; i<count; i++) {
+    for (int i=nams.count(); i<count; i++) {
         nams.append(new NetworkAccessManager(this));
         // QNetworkAccessManager owns its cookie jar; never share a single jar.
         nams.last()->setCookieJar(new QNetworkCookieJar(nams.last()));
