@@ -6,10 +6,11 @@ on:
       - development/v0.1-foundation
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - master
   workflow_dispatch:
+
+concurrency:
+  group: portable-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
   contents: read
