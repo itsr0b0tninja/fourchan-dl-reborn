@@ -84,16 +84,16 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="btnShowImagePreview">
+      <widget class="QPushButton" name="btnMoveThread">
        <property name="toolTip">
-        <string>Open Image Preview</string>
+        <string>Move thread files to the configured destination and close this thread</string>
        </property>
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset resource="resources.qrc">
-         <normaloff>:/icons/resources/image-preview-16x16.png</normaloff>:/icons/resources/image-preview-16x16.png</iconset>
+         <normaloff>:/icons/resources/open.png</normaloff>:/icons/resources/open.png</iconset>
        </property>
       </widget>
      </item>
@@ -617,10 +617,10 @@
    </hints>
   </connection>
   <connection>
-   <sender>btnShowImagePreview</sender>
+   <sender>btnMoveThread</sender>
    <signal>clicked()</signal>
    <receiver>UIImageOverview</receiver>
-   <slot>showImagePreview()</slot>
+   <slot>requestMoveThread()</slot>
    <hints>
     <hint type="sourcelabel">
      <x>377</x>
@@ -676,6 +676,7 @@
   <slot>rebuildThumbnails()</slot>
   <slot>reloadThread()</slot>
   <slot>showImagePreview()</slot>
+  <slot>requestMoveThread()</slot>
   <slot>blockThread(bool)</slot>
   <slot>deleteAllFiles()</slot>
  </slots>

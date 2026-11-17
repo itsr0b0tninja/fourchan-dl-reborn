@@ -2,6 +2,9 @@
 #include "ui_uiimageoverview.h"
 #include <QHBoxLayout>
 #include <QFrame>
+#include <QDir>
+#include <QPainter>
+#include <QFileInfo>
 
 UIImageOverview::UIImageOverview(QWidget *parent) :
     QWidget(parent),
@@ -22,6 +25,24 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
     pendingThumbnails.clear();
 
     ui->setupUi(this);
+
+    // Folder-and-arrow toolbar button; image preview remains available via
+    // double click and the existing thumbnail context menu.
+    QPixmap moveIcon(20, 20);
+    moveIcon.fill(Qt::transparent);
+    {
+        QPainter painter(&moveIcon);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QPen(QColor(90, 73, 33), 1));
+        painter.setBrush(QColor(238, 184, 69));
+        painter.drawRoundedRect(QRectF(1.5, 5.5, 14, 11), 2, 2);
+        painter.drawRect(QRectF(2.5, 3.5, 6, 3));
+        painter.setPen(QPen(QColor(37, 105, 160), 2.3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawLine(QPointF(10, 11), QPointF(18, 11));
+        painter.drawLine(QPointF(14.5, 7.5), QPointF(18, 11));
+        painter.drawLine(QPointF(14.5, 14.5), QPointF(18, 11));
+    }
+    ui->btnMoveThread->setIcon(QIcon(moveIcon));
 
     // These controls live beside the thread rescan settings, above thumbnails.
     videoOverrideCombo = new QComboBox(this);
@@ -62,6 +83,7 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
     closeWhenFinished = false;
     downloading = false;
     running = false;
+    moveInProgress = false;
     nextImageSearchIndex = 0;
 
     deleteFileAction = new QAction(QString("Delete File"), this);
@@ -119,6 +141,7 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
     thumbnailCount = 0;
     thumbnailCountLastViewed = 0;
     updateAttachmentInfo();
+    updateMoveThreadButton();
 }
 
 UIImageOverview::~UIImageOverview()
@@ -142,6 +165,8 @@ bool UIImageOverview::setThumbnailSize(QSize s) {
 }
 
 void UIImageOverview::start(void) {
+    if (moveInProgress)
+        return;
     QDir dir;
     QString savepath;
 
@@ -499,6 +524,144 @@ void UIImageOverview::messageHandler(QString m) {
 
 void UIImageOverview::setTabTitle(QString s) {
     emit tabTitleChanged(this, s);
+}
+
+
+QSet<QString> UIImageOverview::knownDownloadedFilePaths() const {
+    QSet<QString> found;
+    for (const _IMAGE &image : images) {
+        if (!image.downloaded || image.savedAs.isEmpty())
+            continue;
+        const QString path = QDir::cleanPath(QDir::fromNativeSeparators(
+                QFileInfo(image.savedAs).absoluteFilePath()));
+        if (!QFileInfo::exists(path))
+            continue;
+#ifdef Q_OS_WIN
+        found.insert(path.toCaseFolded());
+#else
+        found.insert(path);
+#endif
+    }
+    return found;
+}
+
+void UIImageOverview::updateMoveThreadButton() {
+    const QString destination = settings->value("options/move_thread_directory").toString().trimmed();
+    const bool configured = !destination.isEmpty() && QDir::isAbsolutePath(
+                QDir::fromNativeSeparators(destination));
+    ui->btnMoveThread->setEnabled(configured && !moveInProgress);
+    ui->btnMoveThread->setToolTip(configured
+        ? tr("Move this thread's files to %1 and close it").arg(QDir::toNativeSeparators(destination))
+        : tr("Set 'Move threads to' in Settings before moving a thread"));
+}
+
+void UIImageOverview::refreshMoveThreadButton() {
+    updateMoveThreadButton();
+}
+
+void UIImageOverview::requestMoveThread() {
+    if (!moveInProgress)
+        emit moveThreadRequested(this);
+}
+
+bool UIImageOverview::prepareMoveThread(const QString &destinationRoot,
+                                        QList<ThreadMoveFile> *moves, QString *error) {
+    if (!moves || !error)
+        return false;
+    moves->clear();
+    error->clear();
+
+    if (moveInProgress || ui->leURI->text().trimmed().isEmpty()) {
+        *error = tr("This thread is not ready to move.");
+        return false;
+    }
+
+    // A 404/stopped thread may no longer hold a parser, but its in-session
+    // completed-file records still provide its resolved physical folder.
+    QString sourcePath;
+    if (iParser) {
+        sourcePath = getSavepath();
+    } else {
+        for (const _IMAGE &image : images) {
+            if (!image.savedAs.isEmpty() && QFileInfo::exists(image.savedAs)) {
+                sourcePath = QFileInfo(image.savedAs).absolutePath();
+                break;
+            }
+        }
+    }
+    if (sourcePath.isEmpty()) {
+        *error = tr("No known files or active parser to identify the thread's folder.");
+        return false;
+    }
+    const QString sourceDir = QDir::cleanPath(QDir::fromNativeSeparators(sourcePath));
+    const QString destinationDir = ThreadFileMover::mappedDirectory(
+                ui->leSavepath->text(), sourceDir, destinationRoot, error);
+    if (destinationDir.isEmpty())
+        return false;
+    if (!QDir(sourceDir).exists()) {
+        *error = tr("The thread's source folder no longer exists: %1").arg(sourceDir);
+        return false;
+    }
+
+#ifdef Q_OS_WIN
+    const Qt::CaseSensitivity comparison = Qt::CaseInsensitive;
+#else
+    const Qt::CaseSensitivity comparison = Qt::CaseSensitive;
+#endif
+    QSet<QString> handled;
+    QSet<QString> destinations;
+    for (const _IMAGE &image : images) {
+        if (!image.downloaded || image.savedAs.isEmpty())
+            continue;
+        const QString source = QDir::cleanPath(QDir::fromNativeSeparators(
+                    QFileInfo(image.savedAs).absoluteFilePath()));
+        const QFileInfo sourceInfo(source);
+        // Previously deleted attachments are intentionally not resurrected.
+        if (!sourceInfo.exists())
+            continue;
+        if (!sourceInfo.isFile() || sourceInfo.isSymLink()) {
+            *error = tr("This attachment is not a regular file: %1").arg(source);
+            return false;
+        }
+        const QString relative = QDir::cleanPath(QDir(sourceDir).relativeFilePath(source));
+        if (relative.isEmpty() || relative == "." || relative == ".."
+                || relative.startsWith("../") || QDir::isAbsolutePath(relative)) {
+            *error = tr("Attachment is outside this thread's download folder: %1").arg(source);
+            return false;
+        }
+        if (handled.contains(source))
+            continue;
+        handled.insert(source);
+        const QString target = QDir::cleanPath(QDir(destinationDir).filePath(relative));
+        if (source.compare(target, comparison) == 0 || destinations.contains(target)) {
+            *error = tr("Destination conflicts with a source file: %1").arg(target);
+            return false;
+        }
+        destinations.insert(target);
+        ThreadMoveFile move;
+        move.source = source;
+        move.destination = target;
+        moves->append(move);
+    }
+
+    if (images.isEmpty()) {
+        *error = tr("Thread attachments have not been loaded yet.");
+        return false;
+    }
+    return true;
+}
+
+void UIImageOverview::setMoveInProgress(bool moving) {
+    moveInProgress = moving;
+    setEnabled(!moving);
+    if (moving)
+        setStatus(tr("Moving files..."));
+    updateMoveThreadButton();
+}
+
+void UIImageOverview::showMoveError(const QString &detail) {
+    setStatus(tr("Move failed"));
+    emit errorMessage(tr("Move Thread failed: %1").arg(detail));
 }
 
 void UIImageOverview::setDirectory(QString d) {

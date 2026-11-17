@@ -1,5 +1,16 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.3.2 — One-click thread move and close
+- Replace only the Open Image Preview toolbar button with a folder/arrow Move Thread button. Preserve the internal image viewer, its configuration, thumbnail double-click and Open File actions.
+- Add a single 'Move threads to' destination root in Settings → Thread.
+- Preserve the parser DLL's original folder structure (such as %b/%n/) when moving to the new root.
+- Stop only the selected thread's downloads, move only its recorded, present attachments, then close its tab without adding it to History.
+- Run moves in a background worker to keep the main UI responsive. Do not require confirmation or a destination picker per thread.
+- Preflight conflicts, preserve unrelated files, accept already-identical destinations, verify transfers using SHA-256 and avoid overwriting different files.
+- Copy and verify all files before deleting originals; on a failed copy, clean up new copies and keep the thread open with a visible error. Failed source cleanup also leaves the tab open and retryable.
+- Disable the button when no destination root is configured; never move thumbnails or alter downloaded media settings.
+- Add a Windows smoke test for DLL path mapping, verified copying, file conflicts and copy-stage rollback.
+
 ## v0.3.1 — Configurable, session-based automatic update checks
 - Add three default-on preferences under Settings → General: check GitHub on startup, check every X days (default: one day), and notify of new releases.
 - Start a fresh periodic countdown on every application launch and after each scheduled check; do not persist the countdown across sessions.

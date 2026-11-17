@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QCheckBox>
 #include <QSpinBox>
+#include <QLineEdit>
 #include <QFileDialog>
 #include "uilisteditor.h"
 #include "dialogfoldershortcut.h"
@@ -29,6 +30,7 @@ private:
     Ui::UIConfig *ui;
     QSettings* settings;
     QCheckBox* downloadVideosCheckBox;
+    QLineEdit* moveThreadFolderEdit;
     QCheckBox* updateStartupCheckBox;
     QCheckBox* updatePeriodicCheckBox;
     QSpinBox* updateIntervalDaysSpinBox;
@@ -44,6 +46,7 @@ private slots:
     void accept(void);
     void reject(void);
     void chooseLocation(void);
+    void chooseMoveThreadLocation(void);
     void chooseThumbnailCacheLocation(void);
     void chooseThreadCacheLocation(void);
     void editTimeoutValues(void);

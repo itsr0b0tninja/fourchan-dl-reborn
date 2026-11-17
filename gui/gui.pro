@@ -5,6 +5,7 @@
 #-------------------------------------------------
 
 QT       += core gui widgets network
+CONFIG += c++11
 
 win32:TARGET = ../../4chan-dl-reborn
 else:TARGET = ../fourchan-dl
@@ -34,6 +35,7 @@ SOURCES += main.cpp\
     uiimageviewer.cpp \
     thumbnailcreator.cpp \
     thumbnailremover.cpp \
+    threadfilemover.cpp \
     uipendingrequests.cpp \
     HtmlEntities.cpp
 
@@ -63,6 +65,7 @@ HEADERS  += mainwindow.h \
     uiimageviewer.h \
     thumbnailcreator.h \
     thumbnailremover.h \
+    threadfilemover.h \
     uipendingrequests.h \
     HtmlEntities.h
 
@@ -86,7 +89,7 @@ os2: RC_FILE = fourchan-dl-os2.rc
 macx: ICON = resources/fourchan-dl.icns
 
 BUILDDATE = __DATE__
-VERSION = 0.3.1
+VERSION = 0.3.2
 DEFINES += BUILDDATE=$${BUILDDATE} PROGRAM_VERSION="\\\"$${VERSION}\\\"" __GUI__
 #DEFINES += QT_NO_URL_CAST_FROM_STRING
 #DEFINES += QT_NO_CAST_FROM_ASCII

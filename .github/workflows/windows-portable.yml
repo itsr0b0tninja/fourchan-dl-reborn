@@ -65,6 +65,8 @@ jobs:
           mingw32-make -j2
           qmake-qt5 retry-after-smoke.pro
           mingw32-make -j2
+          qmake-qt5 thread-move-smoke.pro
+          mingw32-make -j2
           popd
           echo "Built executable files:"
           find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'
@@ -78,6 +80,7 @@ jobs:
           test -s portable/streaming-smoke.exe
           test -s portable/video-request-smoke.exe
           test -s portable/retry-after-smoke.exe
+          test -s portable/thread-move-smoke.exe
 
       - name: Bundle the Windows Qt runtime
         shell: msys2 {0}
@@ -189,6 +192,15 @@ jobs:
           & "$root\retry-after-smoke.exe"
           if ($LASTEXITCODE -ne 0) { throw "HTTP 429 cooldown test failed: $LASTEXITCODE" }
           Remove-Item "$root\retry-after-smoke.exe"
+
+      - name: Verify thread move path mapping, integrity and rollback on Windows
+        shell: pwsh
+        run: |
+          $root = (Resolve-Path 'portable').Path
+          $env:PATH = "$root;$env:SystemRoot\System32;$env:SystemRoot"
+          & "$root\thread-move-smoke.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Thread move test failed: $LASTEXITCODE" }
+          Remove-Item "$root\thread-move-smoke.exe"
 
       - name: Create portable ZIP for milestone versions only
         shell: pwsh

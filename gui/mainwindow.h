@@ -10,6 +10,8 @@
 #include <QThread>
 #include <QTimer>
 #include <QDateTime>
+#include <QPointer>
+#include <QHash>
 #include "uiimageoverview.h"
 #include "uiinfo.h"
 #include "uiconfig.h"
@@ -71,6 +73,7 @@ private:
     QDateTime nextPeriodicUpdateCheckUtc;
     bool githubUpdateCheckInProgress;
     bool githubUpdateCheckManual;
+    QHash<ThreadFileMover*, QPointer<UIImageOverview> > activeThreadMoves;
     int periodicUpdateIntervalDays;
     EcWin7 win7;
     bool _paused;
@@ -101,6 +104,7 @@ private:
     QTimer* autosaveTimer;
 
     void cleanThreadCache();
+    void completeThreadMove(ThreadFileMover *worker);
 
 protected:
     void keyPressEvent(QKeyEvent *event);
@@ -114,6 +118,7 @@ private slots:
     int addForegroundTab();
     void addMultipleTabs();
     void closeTab(int);
+    void moveThreadRequested(UIImageOverview*);
     void displayError(QString);
     void changeTabTitle(UIImageOverview*, QString);
     void showInfo(void);

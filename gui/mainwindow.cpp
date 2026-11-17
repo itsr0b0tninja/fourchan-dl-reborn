@@ -160,7 +160,10 @@ int MainWindow::addTab() {
     connect(w, SIGNAL(createTabRequest(QString)), this, SLOT(createTab(QString)));
     connect(w, SIGNAL(removeFiles(QStringList)), this, SIGNAL(removeFiles(QStringList)));
     connect(w, SIGNAL(changed()), this, SLOT(scheduleOverviewUpdate()));
+    connect(w, SIGNAL(moveThreadRequested(UIImageOverview*)), this,
+            SLOT(moveThreadRequested(UIImageOverview*)));
     connect(uiConfig, SIGNAL(configurationChanged()), w, SLOT(videoSettingChanged()));
+    connect(uiConfig, SIGNAL(configurationChanged()), w, SLOT(refreshMoveThreadButton()));
 
     changeTabTitle(w, "idle");
 
@@ -206,10 +209,17 @@ void MainWindow::createTab(QString s) {
 }
 
 void MainWindow::closeTab(int i) {
-    UIImageOverview* w;
+    if (i < 0 || i >= ui->tabWidget->count())
+        return;
+    UIImageOverview* w = (UIImageOverview*)ui->tabWidget->widget(i);
 
-//    ui->tabWidget->setCurrentIndex(i);
-    w = (UIImageOverview*)ui->tabWidget->widget(i);
+    // Never destroy a tab while the worker is transferring its files.
+    for (ThreadFileMover *worker : activeThreadMoves.keys()) {
+        if (activeThreadMoves.value(worker) == w) {
+            displayError(tr("This thread is being moved; it will close automatically when finished."));
+            return;
+        }
+    }
 
     addToHistory(w->getValues(), w->getTitle());
 
@@ -226,6 +236,89 @@ void MainWindow::closeTab(int i) {
         QLOG_TRACE() << Q_FUNC_INFO << "Adding new tab, because no tab is left";
         addTab();
     }
+}
+
+
+void MainWindow::moveThreadRequested(UIImageOverview* w) {
+    if (!w || ui->tabWidget->indexOf(w) < 0)
+        return;
+    if (!activeThreadMoves.isEmpty()) {
+        displayError(tr("Another thread move is in progress."));
+        return;
+    }
+
+    const QString root = settings->value("options/move_thread_directory").toString().trimmed();
+    QList<ThreadMoveFile> files;
+    QString error;
+    if (!w->prepareMoveThread(root, &files, &error)) {
+        w->showMoveError(error);
+        return;
+    }
+
+    // A shared download directory is legitimate. Reject files also tracked
+    // by another open thread rather than removing that thread's only copy.
+    for (int i = 0; i < ui->tabWidget->count(); ++i) {
+        UIImageOverview* other = (UIImageOverview*)ui->tabWidget->widget(i);
+        if (!other || other == w)
+            continue;
+        const QSet<QString> inUse = other->knownDownloadedFilePaths();
+        for (const ThreadMoveFile &file : files) {
+#ifdef Q_OS_WIN
+            const QString key = file.source.toCaseFolded();
+#else
+            const QString key = file.source;
+#endif
+            if (inUse.contains(key)) {
+                w->showMoveError(tr("This file is also used by another monitored thread: %1")
+                                 .arg(file.source));
+                return;
+            }
+        }
+    }
+
+    // Stop requests only after validating the paths. From this point the
+    // background worker sees only immutable path pairs, never live Qt widgets.
+    w->stop();
+    w->setMoveInProgress(true);
+
+    ThreadFileMover* worker = new ThreadFileMover(files, this);
+    activeThreadMoves.insert(worker, QPointer<UIImageOverview>(w));
+    connect(worker, &QThread::finished, this, [this, worker]() {
+        completeThreadMove(worker);
+    });
+    worker->start();
+}
+
+void MainWindow::completeThreadMove(ThreadFileMover* worker) {
+    if (!worker || !activeThreadMoves.contains(worker))
+        return;
+    worker->wait();
+    const QPointer<UIImageOverview> tab = activeThreadMoves.take(worker);
+    const QString error = worker->error();
+    if (tab) {
+        UIImageOverview* w = tab.data();
+        w->setMoveInProgress(false);
+        if (!error.isEmpty()) {
+            // A failed operation leaves its thread open, stopped and retryable.
+            w->showMoveError(error);
+        } else {
+            const int index = ui->tabWidget->indexOf(w);
+            if (index >= 0 && w->close()) {
+                // Unlike the ordinary closeTab() path, an archived thread
+                // is deliberately NOT added to the History menu.
+                ui->tabWidget->removeTab(index);
+                w->deleteLater();
+                if (ui->tabWidget->count() == 0)
+                    addTab();
+                scheduleOverviewUpdate();
+                saveSettings();
+                ui->statusBar->showMessage(tr("Thread files moved and thread removed."), 7000);
+            } else {
+                w->showMoveError(tr("Files moved but the thread tab could not be closed."));
+            }
+        }
+    }
+    worker->deleteLater();
 }
 
 void MainWindow::displayError(QString s) {
@@ -1201,6 +1294,13 @@ void MainWindow::toggleThreadOverview() {
 
 void MainWindow::aboutToQuit() {
     downloadManager->pauseDownloads();
+    // Do not terminate the process halfway through a cross-drive transfer:
+    // finish the worker and reflect a successful removal in saved tabs.
+    const QList<ThreadFileMover*> workers = activeThreadMoves.keys();
+    for (ThreadFileMover* worker : workers) {
+        worker->wait();
+        completeThreadMove(worker);
+    }
     // The thumbnail worker is stopped after the GUI event loop returns.
     saveSettings();
     removeTrayIcon();

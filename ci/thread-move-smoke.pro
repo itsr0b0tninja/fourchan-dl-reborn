@@ -1,0 +1,10 @@
+QT += core
+QT -= gui
+TEMPLATE = app
+CONFIG += console c++11
+CONFIG -= app_bundle
+TARGET = thread-move-smoke
+DESTDIR = ../portable
+INCLUDEPATH += ../gui
+SOURCES += thread-move-smoke.cpp ../gui/threadfilemover.cpp
+HEADERS += ../gui/threadfilemover.h

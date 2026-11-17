@@ -16,6 +16,18 @@ UIConfig::UIConfig(QWidget *parent) :
     downloadVideosCheckBox->setToolTip(tr("Individual threads can override this setting beside their rescan options."));
     ui->formLayout->addRow(tr("Videos"), downloadVideosCheckBox);
 
+    // One global destination root. Individual thread DLL placeholders such
+    // as %b/%n remain intact when its files are moved.
+    moveThreadFolderEdit = new QLineEdit(this);
+    moveThreadFolderEdit->setPlaceholderText(tr("Choose a destination root folder"));
+    moveThreadFolderEdit->setToolTip(tr("The thread's board/thread subfolders will be preserved automatically."));
+    QPushButton* chooseMoveFolderButton = new QPushButton(tr("Browse..."), this);
+    QHBoxLayout* moveFolderRow = new QHBoxLayout();
+    moveFolderRow->addWidget(moveThreadFolderEdit);
+    moveFolderRow->addWidget(chooseMoveFolderButton);
+    ui->formLayout_4->insertRow(1, tr("Move threads to"), moveFolderRow);
+    connect(chooseMoveFolderButton, SIGNAL(clicked()), this, SLOT(chooseMoveThreadLocation()));
+
     // Small update-check section in General; the existing update action and
     // version-information dialog remain unchanged.
     QGroupBox* updateGroup = new QGroupBox(tr("Update checking"), this);
@@ -83,6 +95,7 @@ void UIConfig::loadSettings(void) {
 
     settings->beginGroup("options");
     ui->leDefaultSavepath->setText(settings->value("default_directory","").toString());
+    moveThreadFolderEdit->setText(settings->value("move_thread_directory", "").toString());
     ui->cmbTabPosition->setCurrentIndex(settings->value("tab_position",3).toInt());
     b = settings->value("automatic_close",false).toBool();
         ui->cbAutoClose->setChecked(b);
@@ -216,6 +229,7 @@ void UIConfig::accept(void) {
 
     settings->beginGroup("options");
         settings->setValue("default_directory", ui->leDefaultSavepath->text());
+        settings->setValue("move_thread_directory", moveThreadFolderEdit->text().trimmed());
         settings->setValue("tab_position", ui->cmbTabPosition->currentIndex());
 
         settings->setValue("automatic_close", ui->cbAutoClose->isChecked());
@@ -299,6 +313,13 @@ void UIConfig::chooseLocation(void) {
     loc = QFileDialog::getExistingDirectory(this, "Choose storage directory", ui->leDefaultSavepath->text());
     if (!loc.isEmpty())
         ui->leDefaultSavepath->setText(loc);
+}
+
+void UIConfig::chooseMoveThreadLocation(void) {
+    const QString location = QFileDialog::getExistingDirectory(
+                this, tr("Choose folder for moved threads"), moveThreadFolderEdit->text());
+    if (!location.isEmpty())
+        moveThreadFolderEdit->setText(QDir::toNativeSeparators(location));
 }
 
 void UIConfig::chooseThumbnailCacheLocation(void) {

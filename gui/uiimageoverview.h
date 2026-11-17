@@ -18,6 +18,7 @@
 #include <QImage>
 #include <QCloseEvent>
 #include <QThread>
+#include "threadfilemover.h"
 #include "defines.h"
 #include "mainwindow.h"
 #include "thumbnailcreator.h"
@@ -64,6 +65,11 @@ public:
     void setBlackList(BlackList* bl);
     int getTotalImagesCount() {return images.count();}
     int getDownloadedImagesCount();
+    bool prepareMoveThread(const QString &destinationRoot, QList<ThreadMoveFile> *moves,
+                           QString *error);
+    void setMoveInProgress(bool moving);
+    void showMoveError(const QString &detail);
+    QSet<QString> knownDownloadedFilePaths() const;
 
 private:
     Ui::UIImageOverview *ui;
@@ -99,6 +105,7 @@ private:
     bool running;
     bool closeWhenFinished;
     bool downloading;
+    bool moveInProgress;
     int expectedThumbnailCount;
     int thumbnailCount;
     bool _cachedResult;
@@ -124,6 +131,7 @@ private:
     bool addImage(_IMAGE img);
     QString getSavepath();
     void updateExpectedThumbnailCount();
+    void updateMoveThreadButton();
 
 private slots:
     void on_listWidget_customContextMenuRequested(QPoint pos);
@@ -160,6 +168,7 @@ private slots:
     bool isImage(QUrl);
     void updateDownloadStatus();
     void showImagePreview();
+    void requestMoveThread();
     void blockThread(bool);
 
     void checkForMissingThumbnails();
@@ -170,6 +179,7 @@ public slots:
     void start(void);
     void stop(void);
     void videoSettingChanged();
+    void refreshMoveThreadButton();
     bool checkForExistingThread(QString s="");
 
 signals:
@@ -181,6 +191,7 @@ signals:
     void createTabRequest(QString);
     void removeFiles(QStringList);
     void changed();
+    void moveThreadRequested(UIImageOverview*);
 protected:
     void closeEvent(QCloseEvent *);
 };
