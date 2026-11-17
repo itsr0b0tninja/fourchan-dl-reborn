@@ -1,31 +1,40 @@
-# fourchan-dl 
+# 4chan Downloader Reborn
 
-![fourchan-dl logo](gui/resources/logo.png)
+A maintained, portable Windows build of the original **fourchan-dl** downloader, updated for 4chan's JSON API.
 
-fourchan-dl can download images and webms from 4chan, 2chan, and other imageboards.
+**Latest tested release:** [v0.1.1](https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest) — portable Windows x64 ZIP.
+
+**Current source:** `master` contains ongoing **v0.2.0 download-reliability development**. Unreleased code is not automatically installed. Check [GitHub Releases](https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases) for tested downloadable versions.
+
+## Download and updating
+
+1. Download the portable ZIP from the latest GitHub Release.
+2. Extract into its own folder and run `4chan-dl-reborn.exe`.
+3. For later **published** versions use **Check for Updates** inside the program, then install the offered update.
+
+The working v0.1.1 version has been verified by the project owner to download threads, use HTTPS, close cleanly, and update from v0.1 using its built-in updater.
 
 ## Features
-- Automatic rescanning for new images 
-- Mutliple thread watcher with support for 404 for automatic clenanup
-- Built-in thumbnail viewer for downloaded images
-- Open/reload/delete options for each downloaded image
-- Supports scanning of overview pages (e. g. boards.4chan.org/wg/1)
-- Saves current opened threads, and reload them the next time the program is started
-- Crossplatform, written in Qt/C++: supports Windows, Linux, MacOS and other unix flavours
-- Built-in application updater
-- Support for other imageboards can be added through new plugins
 
-## Supported imageboards
-- 4chan
-- 2chan
-- 7chan.org
-- chanarchive.org
-- archive.foolz.us
-- krautchan
+- Download images and WebM attachments from 4chan threads.
+- Monitor multiple threads and automatically check for new attachments.
+- Resume monitoring previously opened tabs after restarting.
+- Thumbnail browser, folder shortcuts, and basic per-file actions.
+- Portable Qt 5 application with a built-in updater linked to this repository.
 
-You can create an issue if you want to see other imageboards supported
+**Scope:** The Windows portable release currently includes the 4chan parser. Historical support for other imageboards in upstream code is not included in the release package.
 
-Or create a pull-request with your new plugin :)
+## Project workflow
 
-## Fork
-This project is forked from https://sourceforge.net/projects/fourchan-dl/
+This repository intentionally uses **one source branch: `master`**.
+
+- Work in progress is committed directly to `master` and built through GitHub Actions.
+- Only verified versions are made available through GitHub **Releases**.
+- Version tags (`v0.1`, `v0.1.1`, etc.) retain precise source snapshots for recovery or rollback.
+- The application checks published releases, not every commit to `master`.
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+## Credits
+
+Fork of [fourchan-dl](https://sourceforge.net/projects/fourchan-dl/). The upstream project history and authorship remain credited.

@@ -1,0 +1,33 @@
+name: One-time consolidation to master
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/cleanup-one-branch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  delete-old-development-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove superseded development branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for ref in development/v0.1-foundation development/v0.2.0-reliability; do
+            echo "Removing $ref (only if it exists, and never master)"
+            if gh api "repos/$GH_REPO/git/ref/heads/$ref" >/dev/null 2>&1; then
+              gh api --method DELETE "repos/$GH_REPO/git/refs/heads/$ref"
+              echo "Deleted $ref"
+            else
+              echo "Already absent: $ref"
+            fi
+          done
+          echo "Remaining branch heads:"
+          gh api "repos/$GH_REPO/branches?per_page=100" --jq '.[].name'

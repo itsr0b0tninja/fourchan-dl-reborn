@@ -1,4 +1,20 @@
-# Changelog
+# Changelog — 4chan Downloader Reborn
+
+## v0.2.0 — In development (not yet released)
+- Download-reliability changes under development: bounded retries, clearer error categories, failed/missing attachment counts, a Retry Failed action, and file-size validation.
+- Pending compilation, Windows testing, and confirmation before publishing.
+
+## v0.1.1 — Released
+- In-program update test from v0.1 successfully confirmed by the project owner.
+- Version handling updated and graceful application shutdown preserved.
+
+## v0.1 — Released
+- 4chan JSON API parser, GitHub Releases updater, Windows Qt 5 portable packaging and compatible OpenSSL 3 runtime.
+- Fixed clean application shutdown and verified actual Windows downloads.
+
+---
+
+## Historical upstream changelog
 
 ## Version 1.7.0
 * 4chan url changes

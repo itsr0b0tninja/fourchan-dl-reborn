@@ -3,7 +3,7 @@ name: Windows portable and GitHub release
 on:
   push:
     branches:
-      - development/v0.1-foundation
+      - master
     tags:
       - 'v*'
   workflow_dispatch:
