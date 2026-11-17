@@ -1,6 +1,7 @@
 ﻿#include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QDir>
+#include <QHeaderView>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -32,6 +33,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(this, SIGNAL(removeFiles(QStringList)), thumbnailRemover, SLOT(removeFiles(QStringList)));
     ui->setupUi(this);
+    // Keep full per-thread retry times visible in the Status column.
+    ui->threadOverview->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
 
     // Adding actions to menu bar
     ui->menuBar->addAction(ui->actionAdd_Tab);
@@ -646,9 +649,12 @@ void MainWindow::updateThreadOverview() {
                     }
                     item->setText(k, sl.at(k));
                 }
+                item->setToolTip(2, sl.at(2));
             }
             else {                                              // Otherwise create a new one and append it
-                ui->threadOverview->addTopLevelItem(new QTreeWidgetItem(ui->threadOverview, sl));
+                QTreeWidgetItem* newItem = new QTreeWidgetItem(sl);
+                newItem->setToolTip(2, sl.at(2));
+                ui->threadOverview->addTopLevelItem(newItem);
             }
         }
 
