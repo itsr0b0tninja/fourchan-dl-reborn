@@ -55,7 +55,7 @@ jobs:
           find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'
           cp -v 4chan-dl-reborn.exe portable/4chan-dl-reborn.exe
           cp -v plugins/parser4chan.dll portable/plugins/parser4chan.dll
-          cp -v updater/upd4t3r.exe portable/updater/upd4t3r.exe
+          cp -v updater/release/upd4t3r.exe portable/updater/upd4t3r.exe
           test -s portable/4chan-dl-reborn.exe
           test -s portable/plugins/parser4chan.dll
           test -s portable/updater/upd4t3r.exe
