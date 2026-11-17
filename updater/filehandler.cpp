@@ -1,4 +1,8 @@
 #include "filehandler.h"
+#include <QFileInfo>
+#include <QDir>
+#include <QUuid>
+#include <QMap>
 
 FileHandler::FileHandler(QObject *parent) :
     QObject(parent)
