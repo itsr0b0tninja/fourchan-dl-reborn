@@ -13,15 +13,17 @@ class RequestHandler : public QObject
     Q_OBJECT
 public:
     explicit RequestHandler(QObject *parent = 0);
-    void request(QUrl, int priority=-1, qint64 expectedSize=0);
+    void request(QUrl, int priority=-1, qint64 expectedSize=0, QString savePath=QString());
     void cancel(QUrl url);
     void cancelAll();
     void requestFinished(qint64);
+    void requestFileFinished(qint64);
     void error(qint64, int);
 private:
     QHash<qint64,QUrl> requests;
 signals:
     void response(QUrl, QByteArray, bool);
+    void responseFile(QUrl, QString);
     void responseError(QUrl, int);
 public slots:
 };
