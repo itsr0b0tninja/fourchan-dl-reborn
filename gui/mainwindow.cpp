@@ -17,6 +17,7 @@ MainWindow::MainWindow(QWidget *parent) :
     thumbnailRemover = new ThumbnailRemover();
     thumbnailRemover->moveToThread(thumbnailRemoverThread);
     connect(thumbnailRemoverThread, SIGNAL(started()), thumbnailRemover, SLOT(removeOutdated()));
+    connect(thumbnailRemoverThread, SIGNAL(finished()), thumbnailRemover, SLOT(deleteLater()));
     connect(thumbnailRemover, SIGNAL(filesRemoved()), uiConfig, SLOT(thumbnailDeletionFinished()));
     thumbnailRemoverThread->start(QThread::LowPriority);
 
@@ -1102,13 +1103,17 @@ void MainWindow::toggleThreadOverview() {
 
 void MainWindow::aboutToQuit() {
     downloadManager->pauseDownloads();
-    tnt->deleteLater();
-    tnt->wakeup();
+    // The thumbnail worker is stopped after the GUI event loop returns.
     saveSettings();
     removeTrayIcon();
     cleanThreadCache();
-    thumbnailRemover->deleteLater();
-    thumbnailRemoverThread->exit(0);
+    if (thumbnailRemoverThread) {
+        thumbnailRemoverThread->quit();
+        thumbnailRemoverThread->wait();
+        delete thumbnailRemoverThread;
+        thumbnailRemoverThread = 0;
+        thumbnailRemover = 0; // deleted on QThread::finished
+    }
 
     emit quitAll();
 }
