@@ -187,7 +187,7 @@ jobs:
           if ($LASTEXITCODE -eq 0 -and $latest) {
             $latestVersion = $latest.TrimStart('v')
             if ([version]$version -le [version]$latestVersion) {
-              Write-Host "Not publishing $tag: latest published version is v$latestVersion."
+              Write-Host "Not publishing ${tag}: latest published version is v$latestVersion."
               'publish=false' >> $env:GITHUB_OUTPUT
               exit 0
             }
