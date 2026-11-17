@@ -62,6 +62,7 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
 
     connect(requestHandler, SIGNAL(responseError(QUrl, int)), this, SLOT(errorHandler(QUrl, int)));
     connect(requestHandler, SIGNAL(response(QUrl, QByteArray, bool)), this, SLOT(processRequestResponse(QUrl, QByteArray, bool)));
+    connect(requestHandler, SIGNAL(responseFile(QUrl, QString)), this, SLOT(processDownloadedFile(QUrl, QString)));
 
     connect(ui->leSavepath, SIGNAL(textChanged(QString)), this, SIGNAL(directoryChanged(QString)));
     connect(ui->listWidget, SIGNAL(itemDoubleClicked(QListWidgetItem*)), this, SLOT(openFile()));
@@ -778,15 +779,22 @@ void UIImageOverview::createSupervisedDownload(QUrl url) {
             QLOG_DEBUG() << Q_FUNC_INFO << "URL altered to " << url.toString();
         }
         qint64 expectedSize = 0;
+        QString savePath;
         if (isImage(url)) {
             for (int i=0; i<images.count(); ++i) {
                 if (images.at(i).largeURI == url.toString()) {
                     expectedSize = images.at(i).expectedSize;
+                    const QRegExp nameRx(__IMAGEFILE_REGEXP__, Qt::CaseInsensitive, QRegExp::RegExp2);
+                    if (ui->cbOriginalFilename->isChecked()) {
+                        savePath = getSavepath() + "/" + images.at(i).originalFilename;
+                    } else if (nameRx.indexIn(url.toString()) != -1) {
+                        savePath = getSavepath() + "/" + nameRx.cap(1) + nameRx.cap(2);
+                    }
                     break;
                 }
             }
         }
-        requestHandler->request(url, -1, expectedSize);
+        requestHandler->request(url, -1, expectedSize, savePath);
     }
 }
 
@@ -854,6 +862,13 @@ void UIImageOverview::deleteAllFiles() {
     emit removeFiles(files);
 }
 
+void UIImageOverview::processDownloadedFile(QUrl url, QString filename) {
+    if (_threadBlocked)
+        return;
+    createThumbnail(filename);
+    setCompleted(url.toString(), filename);
+}
+
 void UIImageOverview::processRequestResponse(QUrl url, QByteArray ba, bool cached) {
     QString requestURI;
     QList<_IMAGE>   imageList;
@@ -864,7 +879,7 @@ void UIImageOverview::processRequestResponse(QUrl url, QByteArray ba, bool cache
 
     requestURI = url.toString();
     path = url.path();
-    QLOG_TRACE() << "UIImageOverview :: Got response for " << url.toString() << ":" << QString(ba);
+    QLOG_TRACE() << "UIImageOverview :: Received" << ba.size() << "bytes for" << url;
     if (!_threadBlocked) {
         if (isImage(url)) {
             const QRegExp rx(__IMAGEFILE_REGEXP__, Qt::CaseInsensitive, QRegExp::RegExp2);
