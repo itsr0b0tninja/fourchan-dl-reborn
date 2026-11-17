@@ -82,10 +82,16 @@ void DownloadManager::replyFinished(QNetworkReply* reply) {
         QLOG_INFO() << "DownloadManager :: " << "uid 0 finished; url=" << reply->url().toString();
     }
     if (uid != -1) {
-        if (reply->header(QNetworkRequest::ContentLengthHeader).toLongLong() != -1
+        if (reply->error() == QNetworkReply::NoError
+                && reply->header(QNetworkRequest::ContentLengthHeader).isValid()
                 && reply->bytesAvailable() < reply->header(QNetworkRequest::ContentLengthHeader).toLongLong()) {
-            QLOG_INFO() << "DownloadManager :: " << "Received less byte than expected - Possibly because the download timed out";
-            reschedule(uid);
+            QLOG_INFO() << "DownloadManager :: Incomplete response";
+            if (dr != 0 && dr->error_count() < 10) {
+                dr->download_error();
+                reschedule(uid);
+            } else if (dr != 0) {
+                dr->requestHandler()->error(uid, 503);
+            }
         }
         else {
             redirect = reply->header(QNetworkRequest::LocationHeader).toString();
@@ -346,9 +352,7 @@ void DownloadManager::handleError(qint64 uid, QNetworkReply* r) {
                 dr->requestHandler()->error(uid, 404);
             }
 
-            currentRequests--;
-            processRequests();
-
+            // replyFinished owns active-request accounting.
             break;
 
 //        case 205:
@@ -365,7 +369,7 @@ void DownloadManager::handleError(qint64 uid, QNetworkReply* r) {
             }
             else {
                 QLOG_INFO() << "DownloadManager :: Had 10 errors with one download. Giving up.";
-                dr->requestHandler()->error(uid, 404);
+                dr->requestHandler()->error(uid, 503);
             }
 
             break;
@@ -426,7 +430,7 @@ void DownloadManager::reschedule(qint64 uid) {
         priorities.insertMulti(prio,uid);
 
         dr->reset();
-        currentRequests--;
+        // replyFinished adjusts the active-request counter.
         processRequests();
     }
 }
