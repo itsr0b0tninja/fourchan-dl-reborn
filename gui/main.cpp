@@ -124,7 +124,7 @@ void checkEnvironment() {
 
 #ifdef Q_OS_WIN
 #if (QT_VERSION >= 0x050000)
-    neededFiles << "Qt5Core.dll" << "Qt5Network.dll" << "libgcc_s_sjlj-1.dll" << "libstdc++-6.dll" << "upd4t3r.exe" << "libwinpthread-1.dll";
+    neededFiles << "Qt5Core.dll" << "Qt5Network.dll" << "libgcc_s_seh-1.dll" << "libstdc++-6.dll" << "upd4t3r.exe" << "libwinpthread-1.dll";
     qt4Files << "QtCore4.dll" << "QtGui4.dll" << "libgcc_s_dw2-1.dll" << "QtNetwork4.dll" << "QtXml4.dll" << "imageformats/qgif4.dll";
     qt4Files << "imageformats/qico4.dll" << "imageformats/qjpeg4.dll" << "imageformats/qmng4.dll" << "imageformats/qsvg4.dll";
     qt4Files << "imageformats/qtiff4.dll" << "updater/libgcc_s_dw2-1.dll" << "updater/mingwm10.dll" << "updater/QtCore4.dll" << "updater/QtNetwork4.dll";
