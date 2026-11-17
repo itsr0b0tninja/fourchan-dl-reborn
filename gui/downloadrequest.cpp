@@ -11,6 +11,9 @@ DownloadRequest::DownloadRequest(QObject *parent) :
     _paused = false;
     _error_count = 0;
     _expected_size = 0;
+    _streamFile = 0;
+    _streamedBytes = 0;
+    _streamFailed = false;
     reset();
     _url = QUrl("");
     _prio = 0;
@@ -18,9 +21,57 @@ DownloadRequest::DownloadRequest(QObject *parent) :
 }
 
 void DownloadRequest::reset() {
+    abortStreaming();
+    _response.clear();
     _finished = false;
     _processing = false;
     // Retry counts survive re-queues. Only a new request starts at zero.
+}
+
+bool DownloadRequest::beginStreaming() {
+    abortStreaming();
+    if (_savePath.isEmpty())
+        return true;
+    _streamFile = new QSaveFile(_savePath, this);
+    if (!_streamFile->open(QIODevice::WriteOnly)) {
+        delete _streamFile;
+        _streamFile = 0;
+        return false;
+    }
+    return true;
+}
+
+bool DownloadRequest::appendStreaming(const QByteArray &bytes) {
+    if (!_streamFile || _streamFailed)
+        return false;
+    if (bytes.isEmpty())
+        return true;
+    const qint64 written = _streamFile->write(bytes);
+    if (written != bytes.size()) {
+        _streamFailed = true;
+        return false;
+    }
+    _streamedBytes += written;
+    return true;
+}
+
+bool DownloadRequest::commitStreaming() {
+    if (!_streamFile || _streamFailed)
+        return false;
+    const bool ok = _streamFile->commit();
+    delete _streamFile;
+    _streamFile = 0;
+    return ok;
+}
+
+void DownloadRequest::abortStreaming() {
+    if (_streamFile) {
+        _streamFile->cancelWriting();
+        delete _streamFile;
+        _streamFile = 0;
+    }
+    _streamedBytes = 0;
+    _streamFailed = false;
 }
 
 void DownloadRequest::setResponse(QByteArray ba) {
