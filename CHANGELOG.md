@@ -1,5 +1,14 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.2.5 — Thread Overview retry statuses and rendering completion
+- Show per-thread attachment retries directly in the Thread Overview Status column: Downloading (scheduled retry HH:mm:ss).
+- When all media is downloaded, display Finished (scheduled retry HH:mm:ss) if monitoring is due to rescan.
+- Correct duplicate thumbnail queue paths which left some threads displaying Rendering after thumbnails were complete.
+- Immediately clear finished thumbnails from the pending list; restore Finished after an unchanged rescan.
+- Preserve existing Stopped, Blocked, missing and 404 thread states.
+- Remove the unwanted global status-bar retry indicator from v0.2.4.
+- Incremental executable-only release; retain parser v0.2.2.
+
 ## v0.2.4 — Persistent video retry time
 - Show the exact local retry deadline in a permanent status-bar indicator while 4chan's video cooldown is active.
 - Restore that indicator on restart from the persisted cooldown deadline and hide it when the cooldown ends.

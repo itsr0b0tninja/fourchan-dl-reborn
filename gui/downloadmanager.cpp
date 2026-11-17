@@ -456,6 +456,7 @@ void DownloadManager::retryOrFail(qint64 uid, const QString &reason,
                     << "seconds); normal retry budget unchanged:" << dr->url();
         dr->download_error(0, delay);
         reschedule(uid);
+        emit retryScheduleChanged();
         return;
     }
 
@@ -472,6 +473,7 @@ void DownloadManager::retryOrFail(qint64 uid, const QString &reason,
                 << maxRetries << "in" << delay << "seconds:" << dr->url();
     dr->download_error(1, delay);
     reschedule(uid);
+    emit retryScheduleChanged();
 }
 
 void DownloadManager::reschedule(qint64 uid) {
@@ -504,6 +506,28 @@ void DownloadManager::reschedule(qint64 uid) {
     }
 }
 
+QDateTime DownloadManager::nextRetryForAttachments(
+        const QHash<QString, int> &urlIndex) const {
+    QDateTime next;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    QHash<qint64, DownloadRequest*>::const_iterator it = requestList.constBegin();
+    for (; it != requestList.constEnd(); ++it) {
+        DownloadRequest* request = it.value();
+        if (!request || !urlIndex.contains(request->url().toString()))
+            continue;
+        QDateTime until;
+        if (request->paused() && request->retryDeadline() > now)
+            until = request->retryDeadline();
+        if (FourchanRequestHeaders::isFourchanVideo(request->url())
+                && videoCooldownUntil > now
+                && (!until.isValid() || videoCooldownUntil > until))
+            until = videoCooldownUntil;
+        if (until.isValid() && (!next.isValid() || until < next))
+            next = until;
+    }
+    return next;
+}
+
 void DownloadManager::retryReady() {
     if (videoCooldownUntil.isValid()
             && QDateTime::currentDateTimeUtc() >= videoCooldownUntil) {
@@ -513,6 +537,7 @@ void DownloadManager::retryReady() {
     }
     // Do not unpause a user-paused download queue merely because a retry is ready.
     processRequests();
+    emit retryScheduleChanged();
 }
 
 void DownloadManager::resumeDownloads() {

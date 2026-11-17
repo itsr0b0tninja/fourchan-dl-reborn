@@ -8,6 +8,8 @@ ThumbnailCreator::ThumbnailCreator(QObject *parent) :
     newImages = false;
     stopping = false;
     settings = new QSettings("settings.ini", QSettings::IniFormat);
+    cacheFolder = settings->value("options/thumbnail_cache_folder",
+                                 QCoreApplication::applicationDirPath() + "/tncache").toString();
     halted = false;
     use_combined_thumbnail_list = false;
 
@@ -159,10 +161,10 @@ void ThumbnailCreator::setIconSize(QSize s) {
 QString ThumbnailCreator::addToList(QString s) {
     QString ret;
 
-    ret = "";
     mutex.lock();
+    // Even an already-queued thumbnail must return its expected cache path.
+    ret = getCacheFile(s);
     if (!list.contains(s)) {
-        ret = getCacheFile(s);
         list.append(s);
         newImages = true;
     }

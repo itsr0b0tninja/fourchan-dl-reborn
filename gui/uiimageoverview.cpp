@@ -262,32 +262,26 @@ void UIImageOverview::createThumbnail(QString s) {
 }
 
 void UIImageOverview::addThumbnail(QString filename, QString tnFilename) {
-    QListWidgetItem* item;
-
     QLOG_TRACE() << Q_FUNC_INFO << "::" << filename << "," << tnFilename;
-    if (tnFilename != "") {
-//        if (pendingThumbnails.contains(filename)) {
-//            pendingThumbnails.removeAll(filename);
-        if (missingThumbs.contains(filename)) {
-//            missingThumbs.remove(filename);
-            item = new QListWidgetItem(
-                        QIcon(tnFilename),
-                        filename,
-                        ui->listWidget);
+    if (!missingThumbs.contains(filename) || tnFilename.isEmpty()
+            || !QFile::exists(tnFilename))
+        return;
 
-            ui->listWidget->addItem(item);
-            thumbnailsizeLocked = true;
+    // Remove the outstanding entry immediately when the thumbnail is ready.
+    missingThumbs.remove(filename);
+    pendingThumbnails.removeAll(filename);
 
-            if (++thumbnailCount >= expectedThumbnailCount) {
-                //    if (isDownloadFinished()) {
-                updateDownloadStatus();
-            }
+    QListWidgetItem* item = new QListWidgetItem(
+                QIcon(tnFilename),
+                filename,
+                ui->listWidget);
+    ui->listWidget->addItem(item);
+    thumbnailsizeLocked = true;
+    ++thumbnailCount;
 
-            if (this->isVisible()) {
-                thumbnailCountLastViewed = thumbnailCount;
-            }
-        }
-    }
+    if (this->isVisible())
+        thumbnailCountLastViewed = thumbnailCount;
+    updateDownloadStatus();
 }
 
 void UIImageOverview::addThumbnails(QString thumbnails) {
@@ -304,30 +298,20 @@ void UIImageOverview::addThumbnails(QString thumbnails) {
 }
 
 void UIImageOverview::checkForMissingThumbnails() {
-    QMap<QString,QString>::iterator i;
-    QList<QString> found_thumbs;
-
-    QLOG_TRACE() << Q_FUNC_INFO << ":: Checking for thumbnails";
-
-    for (i=missingThumbs.begin(); i!=missingThumbs.end(); i++) {
-        QLOG_TRACE() << Q_FUNC_INFO << ":: Checking for thumbnail" << i.value();
-        if (QFile::exists(i.value())) {
-            QLOG_TRACE() << Q_FUNC_INFO << ":: " << i.value() << "found";
-            addThumbnail(i.key(), i.value());
-            found_thumbs << i.key();
-        }
+    // Collect first: addThumbnail() erases entries from missingThumbs.
+    QList<QPair<QString, QString> > ready;
+    QMap<QString, QString>::const_iterator it = missingThumbs.constBegin();
+    for (; it != missingThumbs.constEnd(); ++it) {
+        if (!it.value().isEmpty() && QFile::exists(it.value()))
+            ready.append(qMakePair(it.key(), it.value()));
     }
+    for (int i=0; i<ready.count(); ++i)
+        addThumbnail(ready.at(i).first, ready.at(i).second);
 
-    for (int k=0; k<found_thumbs.count(); k++) {
-        missingThumbs.remove(found_thumbs.at(k));
-    }
-
-    if (missingThumbs.size() > 0) {
+    if (!missingThumbs.isEmpty())
         thumbnailCheckTimer->start();
-    }
-    else {
+    else
         updateDownloadStatus();
-    }
 }
 
 void UIImageOverview::on_listWidget_customContextMenuRequested(QPoint pos)
@@ -511,6 +495,23 @@ int UIImageOverview::getDownloadedImagesCount() {
 }
 
 QString UIImageOverview::getStatus() {
+    if (!running || _threadBlocked)
+        return _status;
+
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    if (_status.compare("downloading", Qt::CaseInsensitive) == 0) {
+        const QDateTime retry = downloadManager->nextRetryForAttachments(imageIndexByUrl);
+        if (retry.isValid() && retry > now)
+            return QString("Downloading (scheduled retry %1)")
+                    .arg(retry.toLocalTime().toString("HH:mm:ss"));
+        return "Downloading";
+    }
+    if (_status == "Finished" && ui->cbRescan->isChecked() && timer->isActive()) {
+        const int remaining = timer->remainingTime();
+        if (remaining >= 0)
+            return QString("Finished (scheduled retry %1)")
+                    .arg(QDateTime::currentDateTime().addMSecs(remaining).toString("HH:mm:ss"));
+    }
     return _status;
 }
 
@@ -1097,6 +1098,8 @@ void UIImageOverview::mergeImageList(QList<_IMAGE> list) {
     }
     else if (isDownloadFinished()) {
         download(false);
+        // An unchanged rescan must not leave the UI stuck on Parsing.
+        updateDownloadStatus();
     }
 
     updateDownloadStatus();

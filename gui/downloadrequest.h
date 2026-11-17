@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QSaveFile>
+#include <QDateTime>
 #include "requesthandler.h"
 
 class RequestHandler;
@@ -44,6 +45,7 @@ public:
 
     bool paused() {return _paused;}
     void pause(int s);
+    QDateTime retryDeadline() const { return _retryDeadline; }
 
     qint64 expectedSize() const {return _expected_size;}
     void setExpectedSize(qint64 bytes) {_expected_size = qMax(qint64(0), bytes);}
@@ -61,6 +63,7 @@ private:
     qint64 _streamedBytes;
     bool _streamFailed;
     QTimer* pauseTimer;
+    QDateTime _retryDeadline;
     bool _processing;
     bool _finished;
     bool _cached_reply;

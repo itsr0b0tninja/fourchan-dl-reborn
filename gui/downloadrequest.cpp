@@ -85,12 +85,14 @@ void DownloadRequest::pause(int s) {
     }
 
     _paused = true;
+    _retryDeadline = QDateTime::currentDateTimeUtc().addSecs(s);
     pauseTimer->setInterval(s*1000);
     pauseTimer->start();
 }
 
 void DownloadRequest::pauseTimerTriggered() {
     _paused = false;
+    _retryDeadline = QDateTime();
 
     emit requestUnpaused();
 }

@@ -2,7 +2,6 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QLabel>
 #include <QList>
 #include <QSettings>
 #include <QMessageBox>
@@ -43,7 +42,6 @@ public:
 
 private:
     Ui::MainWindow *ui;
-    QLabel* videoRetryLabel;
     QList<UIImageOverview> widgetList;
     QMap<QString, QString> historyList;
     QString defaultDirectory;
@@ -102,7 +100,6 @@ protected:
 #endif
 
 private slots:
-    void updateVideoCooldownStatus(QDateTime until);
     void saveSettings(void);
     int addTab();
     int addForegroundTab();
