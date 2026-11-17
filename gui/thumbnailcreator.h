@@ -26,6 +26,8 @@ public:
     void halt();
     void resume();
     void wakeup();
+    // May be called from the GUI thread; synchronized using mutex.
+    void requestStop();
 
 private:
     QStringList list;
@@ -35,6 +37,7 @@ private:
     volatile bool halted;
     QSettings* settings;
     bool newImages;
+    bool stopping;
     QString cacheFolder;
     bool useCache;
     QMutex mutex;
