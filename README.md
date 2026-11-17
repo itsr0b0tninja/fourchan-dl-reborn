@@ -21,6 +21,7 @@ The owner confirmed successful in-program updating and verified the v0.2.0 attac
 - Resume monitoring previously opened tabs after restarting.
 - Thumbnail browser, folder shortcuts, and basic per-file actions.
 - Portable Qt 5 application with a built-in updater linked to this repository.
+- v0.2.2: Browser-compatible MP4/WebM CDN request headers (User-Agent, board Referer, and full-file range) to address persistent HTTP 429 responses.
 
 **Scope:** The Windows portable release currently includes the 4chan parser. Historical support for other imageboards in upstream code is not included in the release package.
 

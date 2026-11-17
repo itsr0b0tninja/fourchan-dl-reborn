@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     // Portable mode: resolve settings.ini, thumbnails and updater paths beside the executable.
     QDir::setCurrent(a.applicationDirPath());
     a.setApplicationName("4chan Downloader Reborn");
-    a.setApplicationVersion("0.2.1");
+    a.setApplicationVersion("0.2.2");
     QSettings settings("settings.ini", QSettings::IniFormat);
     int logLevel;
 

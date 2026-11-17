@@ -11,7 +11,7 @@ else:TARGET = ../parser4chan
 TEMPLATE = lib
 CONFIG += dll plugin
 
-DEFINES += FOURCHANPARSER_LIBRARY _LIB_VERSION="\\\"0.2.1\\\""
+DEFINES += FOURCHANPARSER_LIBRARY _LIB_VERSION="\\\"0.2.2\\\""
 
 SOURCES += parser4chan.cpp
 
