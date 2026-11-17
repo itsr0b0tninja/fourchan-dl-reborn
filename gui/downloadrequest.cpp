@@ -19,7 +19,7 @@ DownloadRequest::DownloadRequest(QObject *parent) :
 void DownloadRequest::reset() {
     _finished = false;
     _processing = false;
-    _error_count = 0;
+    // Retry count is preserved until the request ends.
 }
 
 void DownloadRequest::setResponse(QByteArray ba) {
