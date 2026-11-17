@@ -47,6 +47,7 @@ HEADERS  += mainwindow.h \
     ../updater/commands.h \
     blacklist.h \
     downloadmanager.h \
+    retryafterpolicy.h \
     requesthandler.h \
     supervisednetworkreply.h \
     downloadrequest.h \
@@ -85,7 +86,7 @@ os2: RC_FILE = fourchan-dl-os2.rc
 macx: ICON = resources/fourchan-dl.icns
 
 BUILDDATE = __DATE__
-VERSION = 0.2.2
+VERSION = 0.2.3
 DEFINES += BUILDDATE=$${BUILDDATE} PROGRAM_VERSION="\\\"$${VERSION}\\\"" __GUI__
 #DEFINES += QT_NO_URL_CAST_FROM_STRING
 #DEFINES += QT_NO_CAST_FROM_ASCII

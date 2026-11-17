@@ -1,5 +1,6 @@
 ﻿#include "downloadmanager.h"
 #include "fourchanrequestheaders.h"
+#include "retryafterpolicy.h"
 
 #define MAX_CONCURRENT_DOWNLOADS_PER_NAM 5
 
@@ -17,6 +18,9 @@ DownloadManager::DownloadManager(QObject *parent) :
     waitTimer = new QTimer(this);
     waitTimer->setSingleShot(true);
     waitTimer->setInterval(20000);
+    videoCooldownTimer = new QTimer(this);
+    videoCooldownTimer->setSingleShot(true);
+    connect(videoCooldownTimer, SIGNAL(timeout()), this, SLOT(retryReady()));
 
     requestList.clear();
     lastid = 0;
@@ -31,6 +35,9 @@ DownloadManager::DownloadManager(QObject *parent) :
     _highestPriority = 100;
 
     loadSettings();
+    const qint64 remaining = QDateTime::currentDateTimeUtc().msecsTo(videoCooldownUntil);
+    if (remaining > 0)
+        videoCooldownTimer->start(static_cast<int>(qMin<qint64>(remaining, 86400000)));
 
 //    _manager = new QNetworkAccessManager(this);
 //    connect(_manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
@@ -48,6 +55,8 @@ void DownloadManager::loadSettings() {
         _threadCachePath = settings->value("thread_cache_path", "").toString();
         maxRetries = qBound(0, settings->value("max_retries", 4).toInt(), 20);
         retryDelaySeconds = qBound(1, settings->value("retry_delay_seconds", 5).toInt(), 120);
+        videoCooldownUntil = QDateTime::fromString(
+            settings->value("video_cooldown_utc").toString(), Qt::ISODate).toUTC();
     settings->endGroup();
 
     settings->beginGroup("statistics");
@@ -297,6 +306,10 @@ void DownloadManager::processRequests() {
                         if (!(requestList.value(uid)->finished()) &&
                             !(requestList.value(uid)->processing()) &&
                             !(requestList.value(uid)->paused())) {
+                            // A CDN video cooldown does not block image or thread updates.
+                            if (FourchanRequestHeaders::isFourchanVideo(requestList.value(uid)->url())
+                                    && QDateTime::currentDateTimeUtc() < videoCooldownUntil)
+                                continue;
                             startRequest(uid);
                             //                            QLOG_TRACE() << "DownloadManager :: " << "addRequest (" << uid << ")";
                         }
@@ -399,34 +412,56 @@ void DownloadManager::handleError(qint64 uid, QNetworkReply* reply) {
         return;
     }
 
-    // 429 is a server rejection, not proof that media is deleted.
-    // Keep Retry Failed available; report video-specific response details so
-    // a repeated browser-only failure can be diagnosed without guessing.
-    if (httpCode == 429 && FourchanRequestHeaders::isFourchanVideo(reply->url())) {
-        QLOG_WARN() << "DownloadManager :: Video CDN returned HTTP 429"
-                    << "Retry-After:" << reply->rawHeader("Retry-After")
-                    << "Content-Type:" << reply->header(QNetworkRequest::ContentTypeHeader).toString();
+    // A 429 is a temporary throttle. Keep its retry budget unchanged.
+    const bool limited = (httpCode == 429);
+    int retryAfterSeconds = 0;
+    if (limited) {
+        retryAfterSeconds = RetryAfterPolicy::delaySeconds(
+            reply->rawHeader("Retry-After"), qMax(60, retryDelaySeconds * 4));
+        if (FourchanRequestHeaders::isFourchanVideo(reply->url())) {
+            const QDateTime deadline = QDateTime::currentDateTimeUtc().addSecs(retryAfterSeconds);
+            if (!videoCooldownUntil.isValid() || deadline > videoCooldownUntil) {
+                videoCooldownUntil = deadline;
+                settings->setValue("download_manager/video_cooldown_utc",
+                                   deadline.toString(Qt::ISODate));
+                videoCooldownTimer->start(retryAfterSeconds * 1000);
+            }
+            QLOG_WARN() << "DownloadManager :: Video CDN HTTP 429"
+                        << "Retry-After:" << reply->rawHeader("Retry-After")
+                        << "Content-Type:"
+                        << reply->header(QNetworkRequest::ContentTypeHeader).toString();
+            emit error(QString("4chan video rate limited; retry at %1 (local time)")
+                .arg(videoCooldownUntil.toLocalTime().toString("HH:mm:ss")));
+        }
     }
-    retryOrFail(uid, reply->errorString(), httpCode == 429);
+    retryOrFail(uid, reply->errorString(), limited, retryAfterSeconds);
 }
 
-void DownloadManager::retryOrFail(qint64 uid, const QString &reason, bool rateLimited) {
+void DownloadManager::retryOrFail(qint64 uid, const QString &reason,
+                                  bool rateLimited, int retryAfterSeconds) {
     DownloadRequest* dr = requestList.value(uid, 0);
     if (!dr)
         return;
     dr->abortStreaming();
 
+    if (rateLimited) {
+        const int delay = qBound(1, retryAfterSeconds, 86400);
+        QLOG_INFO() << "DownloadManager :: HTTP 429 - retry scheduled in"
+                    << delay << "seconds; normal retry budget unchanged:" << dr->url();
+        dr->download_error(0, delay);
+        reschedule(uid);
+        return;
+    }
+
     if (dr->error_count() >= maxRetries) {
         QLOG_WARN() << "DownloadManager :: Giving up after"
                     << dr->error_count() << "retries:" << dr->url() << reason;
-        // 503 is a retryable terminal failure in the thread UI, never a 404.
         dr->requestHandler()->error(uid, 503);
         return;
     }
 
     const int attempt = dr->error_count() + 1;
-    const int delay = rateLimited ? qMax(60, retryDelaySeconds * 4)
-        : qMin(120, retryDelaySeconds * (1 << qMin(attempt-1, 5)));
+    const int delay = qMin(120, retryDelaySeconds * (1 << qMin(attempt-1, 5)));
     QLOG_INFO() << "DownloadManager :: Retry" << attempt << "of"
                 << maxRetries << "in" << delay << "seconds:" << dr->url();
     dr->download_error(1, delay);
@@ -464,6 +499,11 @@ void DownloadManager::reschedule(qint64 uid) {
 }
 
 void DownloadManager::retryReady() {
+    if (videoCooldownUntil.isValid()
+            && QDateTime::currentDateTimeUtc() >= videoCooldownUntil) {
+        videoCooldownUntil = QDateTime();
+        settings->remove("download_manager/video_cooldown_utc");
+    }
     // Do not unpause a user-paused download queue merely because a retry is ready.
     processRequests();
 }

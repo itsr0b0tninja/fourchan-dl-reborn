@@ -6,6 +6,7 @@
 #include <QUrl>
 #include <QtNetwork>
 #include <QSettings>
+#include <QDateTime>
 #include "requesthandler.h"
 #include "supervisednetworkreply.h"
 #include "downloadrequest.h"
@@ -48,6 +49,8 @@ private:
     QMultiMap<int, qint64> priorities;
     QSettings* settings;
     QTimer* waitTimer;
+    QTimer* videoCooldownTimer;
+    QDateTime videoCooldownUntil;
     NetworkAccessManager* getFreeNAM();
 //    QNetworkAccessManager* _manager;
     QNetworkCookieJar* cookies;
@@ -70,7 +73,7 @@ private:
 
     void addRequest(qint64, DownloadRequest*);
     void handleError(qint64, QNetworkReply*);
-    void retryOrFail(qint64, const QString &, bool rateLimited=false);
+    void retryOrFail(qint64, const QString &, bool rateLimited=false, int retryAfterSeconds=0);
     void reschedule(qint64);
     void processRequests();
     inline qint64 getUID() {return ++lastid;}

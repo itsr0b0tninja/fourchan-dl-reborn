@@ -1,5 +1,12 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.2.3 — HTTP 429 retry handling and incremental update
+- Honour Retry-After (seconds or HTTP-date), with a short margin and 24-hour cap.
+- HTTP 429 pauses downloads without consuming the ordinary retry budget.
+- Persist a shared video cooldown; allow images and thread updates to continue.
+- Display the expected video retry time locally and test the policy in Windows CI.
+- Publish the changed executable and manifest individually, keep the v0.2.2 parser as a reusable component, and distribute LICENSE.txt separately. Only x.y.0 releases require portable ZIPs.
+
 ## v0.2.2 — Released (video CDN response pending Windows user verification)
 - Address a reproducible pattern where images download but MP4/WebM return HTTP 429 in the desktop application even when the same URLs open in a browser.
 - Use a browser-compatible User-Agent in place of the legacy Wget/1.12 default, honouring intentional custom user agents.

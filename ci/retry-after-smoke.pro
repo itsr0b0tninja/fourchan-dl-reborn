@@ -1,0 +1,10 @@
+QT += core network
+QT -= gui
+TEMPLATE = app
+CONFIG += console c++11
+CONFIG -= app_bundle
+TARGET = retry-after-smoke
+DESTDIR = ../portable
+INCLUDEPATH += ../gui
+SOURCES += retry-after-smoke.cpp ../gui/downloadrequest.cpp
+HEADERS += ../gui/retryafterpolicy.h ../gui/downloadrequest.h

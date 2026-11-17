@@ -7,6 +7,9 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+  pull_request:
+    branches:
+      - master
 
 concurrency:
   group: portable-${{ github.ref }}
@@ -60,6 +63,8 @@ jobs:
           mingw32-make -j2
           qmake-qt5 video-request-smoke.pro
           mingw32-make -j2
+          qmake-qt5 retry-after-smoke.pro
+          mingw32-make -j2
           popd
           echo "Built executable files:"
           find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'
@@ -72,6 +77,7 @@ jobs:
           test -s portable/tls-smoke.exe
           test -s portable/streaming-smoke.exe
           test -s portable/video-request-smoke.exe
+          test -s portable/retry-after-smoke.exe
 
       - name: Bundle the Windows Qt runtime
         shell: msys2 {0}
@@ -175,10 +181,24 @@ jobs:
           }
           Remove-Item "$root\video-request-smoke.exe"
 
-      - name: Create downloadable portable ZIP
+      - name: Verify HTTP 429 cooldown policy on Windows
         shell: pwsh
         run: |
-          Compress-Archive -Path 'portable/*' -DestinationPath 'dist/4chan-dl-reborn-win64-portable.zip' -Force
+          $root = (Resolve-Path 'portable').Path
+          $env:PATH = "$root;$env:SystemRoot\System32;$env:SystemRoot"
+          & "$root\retry-after-smoke.exe"
+          if ($LASTEXITCODE -ne 0) { throw "HTTP 429 cooldown test failed: $LASTEXITCODE" }
+          Remove-Item "$root\retry-after-smoke.exe"
+
+      - name: Create portable ZIP for milestone versions only
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path 'gui/gui.pro' -Pattern '^VERSION\s*=\s*(\d+\.\d+\.\d+)').Matches[0].Groups[1].Value
+          if ($version -match '^\d+\.\d+\.0$') {
+            Compress-Archive -Path 'portable/*' -DestinationPath 'dist/4chan-dl-reborn-win64-portable.zip' -Force
+          } else {
+            Write-Host "Incremental v$version: no portable ZIP."
+          }
 
       - name: Upload portable build
         uses: actions/upload-artifact@v4
@@ -203,7 +223,9 @@ jobs:
           $version = $matches[0].Matches[0].Groups[1].Value
           $tag = "v$version"
           $plugin = Get-Content 'plugins/parser4chan/parser4chan.pro' -Raw
-          if (-not $plugin.Contains($version)) { throw 'The 4chan parser version differs from the app version.' }
+          $parserVersion = [regex]::Match($plugin, '_LIB_VERSION.*?(\d+\.\d+\.\d+)').Groups[1].Value
+          if (-not $parserVersion) { throw 'Parser version missing.' }
+          if ([version]$parserVersion -gt [version]$version) { throw 'Parser version exceeds app.' }
           "version=$version" >> $env:GITHUB_OUTPUT
           gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
@@ -233,42 +255,39 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $tag = "v$env:REBORN_VERSION"
           $base = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag"
+          $parser = Get-Content 'plugins/parser4chan/parser4chan.pro' -Raw
+          $parserVersion = [regex]::Match($parser, '_LIB_VERSION.*?(\d+\.\d+\.\d+)').Groups[1].Value
+          $parserBase = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$parserVersion"
           New-Item -ItemType Directory -Force 'release-assets' | Out-Null
           @"
           <updates>
           <win32-qt5>
           <file name="4chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="$env:REBORN_VERSION" source="$base/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
-          <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="$env:REBORN_VERSION" source="$base/parser4chan.dll" target="plugins/parser4chan.dll" />
+          <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="$parserVersion" source="$parserBase/parser4chan.dll" target="plugins/parser4chan.dll" />
           </win32-qt5>
           </updates>
           "@ | Set-Content -Path 'release-assets/webupdate.xml' -Encoding utf8
           @"
           4chan Downloader Reborn $tag
 
-          Windows 64-bit portable release, built and tested by GitHub Actions.
-          The app and parser can be installed from the application's built-in
-          GitHub updater. The portable ZIP is attached as a fallback.
+          Incremental updater release: individually distributed components.
+          Milestone versions ending .0 include a complete portable ZIP.
+          LICENSE.txt is distributed separately.
 
-          Changes: see CHANGELOG.md on the repository homepage.
-
-          Keep a backup of the last known-working version until you have
-          personally tested the new version on your PC.
+          See CHANGELOG.md for details.
           "@ | Set-Content -Path 'release-assets/release-notes.txt' -Encoding utf8
-          Copy-Item dist/4chan-dl-reborn-win64-portable.zip release-assets/
           Copy-Item portable/4chan-dl-reborn.exe release-assets/
-          Copy-Item portable/plugins/parser4chan.dll release-assets/
-          Copy-Item portable/updater/upd4t3r.exe release-assets/
+          Copy-Item portable/LICENSE.txt release-assets/LICENSE.txt
+          if ($parserVersion -eq $env:REBORN_VERSION) {
+            Copy-Item portable/plugins/parser4chan.dll release-assets/
+          }
+          if (Test-Path 'dist/4chan-dl-reborn-win64-portable.zip') {
+            Copy-Item dist/4chan-dl-reborn-win64-portable.zip release-assets/
+          }
           Get-FileHash -Algorithm SHA256 release-assets/*.exe | ForEach-Object {
             "$($_.Hash)  $($_.Path | Split-Path -Leaf)"
           } | Set-Content -Path release-assets/SHA256SUMS.txt -Encoding ascii
-          $assets = @(
-            'release-assets/4chan-dl-reborn-win64-portable.zip',
-            'release-assets/4chan-dl-reborn.exe',
-            'release-assets/parser4chan.dll',
-            'release-assets/upd4t3r.exe',
-            'release-assets/webupdate.xml',
-            'release-assets/SHA256SUMS.txt'
-          )
+          $assets = @(Get-ChildItem release-assets -File | Where-Object { $_.Name -ne 'release-notes.txt' } | ForEach-Object { $_.FullName })
           gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "4chan Downloader Reborn $tag" --notes-file release-assets/release-notes.txt $assets
           if ($LASTEXITCODE -ne 0) { throw "Failed to publish $tag" }
 
@@ -279,18 +298,25 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          parser_version="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' plugins/parser4chan/parser4chan.pro | head -1)"
+          test -n "$parser_version"
+          parser_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/v$parser_version"
           cat > release-assets/webupdate.xml << EOF
           <updates>
           <win32-qt5>
           <file name="4chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="$version" source="$url/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
-          <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="$version" source="$url/parser4chan.dll" target="plugins/parser4chan.dll" />
+          <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="$parser_version" source="$parser_url/parser4chan.dll" target="plugins/parser4chan.dll" />
           </win32-qt5>
           </updates>
           EOF
-          cp dist/4chan-dl-reborn-win64-portable.zip release-assets/
+          if test -f dist/4chan-dl-reborn-win64-portable.zip; then
+            cp dist/4chan-dl-reborn-win64-portable.zip release-assets/
+          fi
           cp portable/4chan-dl-reborn.exe release-assets/
-          cp portable/plugins/parser4chan.dll release-assets/
-          cp portable/updater/upd4t3r.exe release-assets/
+          cp portable/LICENSE.txt release-assets/LICENSE.txt
+          if test "$parser_version" = "$version"; then
+            cp portable/plugins/parser4chan.dll release-assets/
+          fi
           cat release-assets/webupdate.xml
 
       - name: Publish tagged GitHub Release
