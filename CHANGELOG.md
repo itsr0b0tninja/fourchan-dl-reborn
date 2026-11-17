@@ -1,5 +1,12 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.2.2 — Video-download hotfix (pending verification)
+- Address a reproducible pattern where images download but MP4/WebM return HTTP 429 in the desktop application even when the same URLs open in a browser.
+- Use a browser-compatible User-Agent in place of the legacy Wget/1.12 default, honouring intentional custom user agents.
+- Send video CDN requests with a board Referer and a complete-byte-range request (bytes=0-); preserve original-size validation and atomic temporary-file downloads.
+- Add diagnostic logging for video HTTP 429 replies and a Windows request-header regression test.
+- No changes to global download delays, threading limits, or user interface layout.
+
 ## v0.2.1 — Release
 - Write attachments progressively to atomic temporary files rather than retaining entire media bodies in RAM; verify expected byte counts before committing.
 - Index known attachment URLs and original filenames and avoid repeated full-list scans while queuing attachments and rescanning threads.
