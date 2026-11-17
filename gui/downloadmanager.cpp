@@ -222,6 +222,7 @@ void DownloadManager::freeRequest(qint64 uid) {
     if (dr != 0) {
         dr->deleteLater();
         requestList.remove(uid);
+        priorities.remove(priorities.key(uid), uid);
         activeReplies.remove(uid);
     }
 //    QLOG_TRACE() << "DownloadManager :: " << "open requests" << requestList.keys();
@@ -247,7 +248,9 @@ qint64 DownloadManager::requestDownload(RequestHandler* caller, QUrl url, int pr
     requestList.insert(uid, dr);
     priorities.insertMulti(prio, uid);
 
-    processRequests();
+    // Defer queue processing until the caller has stored the request ID.
+    // Also batch bursts of requests when many restored tabs start together.
+    QTimer::singleShot(0, this, SLOT(retryReady()));
 
     emit totalRequestsChanged(++totalRequests);
 
