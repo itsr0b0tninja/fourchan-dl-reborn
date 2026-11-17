@@ -34,6 +34,9 @@ public:
     bool paused() {return _paused;}
     void pause(int s);
 
+    qint64 expectedSize() const {return _expected_size;}
+    void setExpectedSize(qint64 bytes) {_expected_size = qMax(qint64(0), bytes);}
+
     int error_count() {return _error_count;}
     void download_error(int increment=1, int delaySeconds=10);
 
@@ -48,6 +51,7 @@ private:
     bool _cached_reply;
     bool _paused;
     int _error_count;
+    qint64 _expected_size;
 
 
 private slots:
