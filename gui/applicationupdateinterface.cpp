@@ -60,7 +60,8 @@ void ApplicationUpdateInterface::processCommand(QByteArray a) {
         break;
 
     case CLOSE_REQUEST:
-        exit(0);
+        // Complete normal shutdown, including worker-thread cleanup.
+        QCoreApplication::quit();
         break;
 
     case DISPLAY_MSG:

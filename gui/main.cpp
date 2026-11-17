@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     // Portable mode: resolve settings.ini, thumbnails and updater paths beside the executable.
     QDir::setCurrent(a.applicationDirPath());
     a.setApplicationName("4chan Downloader Reborn");
-    a.setApplicationVersion("0.1");
+    a.setApplicationVersion("0.1.1");
     QSettings settings("settings.ini", QSettings::IniFormat);
     int logLevel;
 
@@ -206,12 +206,12 @@ bool checkIfNewerVersion(QString _new, QString _old) {
     oldVersion = _old.split(".");
 
     for (int i=0; i<newVersion.count(); i++) {
-        if (newVersion.value(i).toInt() > oldVersion.at(i).toInt()) {
+        if (newVersion.value(i).toInt() > oldVersion.value(i, "0").toInt()) {
             ret = true;
             break;
         }
         else {
-            if (oldVersion.at(i).toInt() > newVersion.value(i).toInt()) {
+            if (oldVersion.value(i, "0").toInt() > newVersion.value(i).toInt()) {
                 break;
             }
         }

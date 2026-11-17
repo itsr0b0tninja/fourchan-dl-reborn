@@ -119,7 +119,7 @@ jobs:
           done
           cp LICENSE portable/LICENSE.txt
           printf '%s\n' \
-            '4chan Downloader Reborn v0.1 - portable Windows 64-bit' \
+            '4chan Downloader Reborn v0.1.1 update test - portable Windows 64-bit' \
             'Extract this ZIP into a NEW folder; do not overwrite your original installation.' \
             'Launch 4chan-dl-reborn.exe. Use Check for Updates for future published versions.' \
             'The update service uses the GitHub repository itsr0b0tninja/fourchan-dl-reborn.' \
