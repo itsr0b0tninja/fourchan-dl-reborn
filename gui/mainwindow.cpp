@@ -41,6 +41,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->menuBar->addAction(ui->actionStop_all);
 
     ui->menuBar->addAction(ui->actionOpen_Configuration);
+    QAction* checkUpdatesAction = new QAction(tr("Check for Updates"), this);
+    ui->menuBar->addAction(checkUpdatesAction);
+    connect(checkUpdatesAction, SIGNAL(triggered()), this, SLOT(checkForGitHubUpdates()));
 //    ui->actionOpen_Configuration->setCheckable(true);
 
     historyMenu = new QMenu(ui->menuBar);
@@ -98,7 +101,7 @@ MainWindow::MainWindow(QWidget *parent) :
 #ifdef __DEBUG__
     createSupervisedDownload(QUrl("file:d:/Qt/fourchan-dl/webupdate.xml"));
 #else
-    createSupervisedDownload(QUrl(QString::fromUtf8("http://www.sourceforge.net/projects/fourchan-dl/files/webupdate/webupdate.xml/download")));
+    checkForGitHubUpdates();
 #endif
 
 #ifdef Q_OS_WIN
@@ -409,8 +412,11 @@ void MainWindow::processCloseRequest(UIImageOverview* w, int reason) {
 
 void MainWindow::processRequestResponse(QUrl url, QByteArray ba, bool cached) {
 
-    if (url.toString().contains("webupdate.xml")) {
-        checkForUpdates(QString(ba));
+    // GitHub's release asset CDN redirects to signed URLs that may not retain the filename.
+    const QByteArray body = ba.trimmed();
+    if (url.toString().contains("webupdate.xml")
+            || (body.startsWith("<updates>") && body.contains("<win32-qt5>"))) {
+        checkForUpdates(QString::fromUtf8(ba));
     }
     else {
         QLOG_WARN() << "MainWindow :: MainWindow should only ask for webupdate.xml but response was for" << url.toString();
@@ -452,7 +458,7 @@ void MainWindow::askForUpdate() {
     case QMessageBox::Ok:
     case QMessageBox::Yes:
         saveSettings();
-        fi.setFile(updaterFileName);
+        fi.setFile(QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(updaterFileName));
 
         QLOG_INFO() << "MainWindow :: Starting updater " << fi.absoluteFilePath();
 
@@ -471,7 +477,7 @@ void MainWindow::askForUpdate() {
         break;
     }
 #else
-    msg.append("<br><a href=\"http://sourceforge.net/projects/fourchan-dl/files/\">http://sourceforge.net/projects/fourchan-dl</a>");
+    msg.append("<br><a href=\"https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases\">GitHub Releases</a>");
 
     QMessageBox::information(0,
                              "New version available",
@@ -485,7 +491,7 @@ void MainWindow::getUpdaterVersion() {
     QProcess process;
     QFileInfo fi;
 
-    fi.setFile(updaterFileName);
+    fi.setFile(QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(updaterFileName));
 
     QLOG_INFO() << "MainWindow :: Starting updater " << fi.absoluteFilePath();
 
@@ -725,6 +731,11 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
     }
 }
 
+void MainWindow::checkForGitHubUpdates() {
+    ui->statusBar->showMessage(tr("Checking GitHub Releases for updates..."), 5000);
+    createSupervisedDownload(QUrl("https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest/download/webupdate.xml"));
+}
+
 void MainWindow::createSupervisedDownload(QUrl url) {
     if (url.isValid()) {
         requestHandler->request(url, 0);
@@ -817,12 +828,12 @@ bool MainWindow::checkIfNewerVersion(QString _new, QString _old) {
     oldVersion = _old.split(".");
 
     for (int i=0; i<newVersion.count(); i++) {
-        if (newVersion.value(i).toInt() > oldVersion.at(i).toInt()) {
+        if (newVersion.value(i).toInt() > oldVersion.value(i, "0").toInt()) {
             ret = true;
             break;
         }
         else {
-            if (oldVersion.at(i).toInt() > newVersion.value(i).toInt()) {
+            if (oldVersion.value(i, "0").toInt() > newVersion.value(i).toInt()) {
                 break;
             }
         }
@@ -950,7 +961,8 @@ void MainWindow::updaterConnected() {
 
             foreach (QString component, updateableComponents) {
                 c = components.value(component);
-                fileList.append(QString("%1->%2").arg(c.src).arg(c.target));
+                const QString target = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(c.target);
+                fileList.append(QString("%1->%2").arg(c.src, target));
             }
             aui->addFiles(fileList);
             aui->startUpdate();
