@@ -161,7 +161,7 @@ void checkEnvironment() {
     }
 
     updaterFileName = "";
-    if (QFile::exists("updater/upd4t3r.exe")) {
+    if (QFile::exists(QDir(dir.path()).absoluteFilePath("updater/upd4t3r.exe"))) {
         // The new updater is already present
         // Use this for updating the components
         // If old updater still exists, delete it because it's not needed anymore
