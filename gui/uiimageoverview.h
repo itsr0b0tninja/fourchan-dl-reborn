@@ -9,6 +9,7 @@
 #include <QStyle>
 #include <QSettings>
 #include <QSet>
+#include <QHash>
 #include <QPushButton>
 #include <QSaveFile>
 #include <QFileInfo>
@@ -68,6 +69,10 @@ private:
     QTimer* thumbnailCheckTimer;
     QList<int> timeoutValues;
     QList<_IMAGE> images;
+    QHash<QString, int> imageIndexByUrl;
+    QSet<QString> originalFilenameSet;
+    QHash<QString, int> nextFilenameNumber;
+    int nextImageSearchIndex;
     QSet<QString> failedImageUrls;
     QSet<QString> missingImageUrls;
     QPushButton* retryFailedButton;
