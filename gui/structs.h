@@ -1,6 +1,8 @@
 ﻿#ifndef STRUCTS_H
 #define STRUCTS_H
 
+#include <QtGlobal>
+
 struct _IMAGE
 {
     QString largeURI;
@@ -9,6 +11,7 @@ struct _IMAGE
     QString savedAs;
     bool downloaded;
     bool requested;
+    qint64 expectedSize; // Expected attachment bytes from 4chan's fsize, if known.
 };
 
 struct ParsingStatus

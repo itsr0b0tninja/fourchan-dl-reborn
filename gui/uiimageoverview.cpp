@@ -21,6 +21,12 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
 
     ui->setupUi(this);
 
+    retryFailedButton = new QPushButton(tr("Retry Failed"), this);
+    retryFailedButton->setToolTip(tr("Retry failed or missing attachments without re-downloading successful files"));
+    ui->horizontalLayout_3->insertWidget(2, retryFailedButton);
+    retryFailedButton->hide();
+    connect(retryFailedButton, SIGNAL(clicked()), this, SLOT(retryFailedDownloads()));
+
 #ifndef __DEBUG__
     ui->btnDebug->hide();
 #endif
@@ -419,36 +425,60 @@ void UIImageOverview::openFile(void) {
 }
 
 void UIImageOverview::errorHandler(QUrl url, int err) {
-    switch (err) {
-    case 202:
-    case 404:
-        if (isImage(url)) {
-            blackList->add(url.toString());
-            setCompleted(url.toString(), "");
+    const QString uri = url.toString();
+    if (isImage(url)) {
+        if (err == 404 || err == 202) {
+            // Server confirmed the attachment is gone. Keep a separate count:
+            // a missing attachment must never be reported as downloaded.
+            missingImageUrls.insert(uri);
+            failedImageUrls.remove(uri);
+        } else {
+            // Timeouts, truncated replies and transient HTTP/network errors
+            // should remain retryable, never automatically blacklisted.
+            failedImageUrls.insert(uri);
+            missingImageUrls.remove(uri);
         }
-        else {
-            // If there are still images in the list, wait until they finished (maybe they still exist)
-            // else close immediately
-            if (isDownloadFinished()) {
-                stop();
+        for (int i = 0; i < images.count(); ++i) {
+            if (images.at(i).largeURI == uri) {
+                _IMAGE image = images.at(i);
+                image.requested = false;
+                image.downloaded = false;
+                images.replace(i, image);
+                break;
+            }
+        }
+        QLOG_WARN() << "UIImageOverview :: Attachment failed" << uri << err;
+        updateDownloadStatus();
+        emit errorMessage(QString("Attachment %1: %2").arg(
+            err == 404 ? "missing" : "failed", uri));
+        return;
+    }
 
-                setTabTitle("Thread 404'ed");
-                emit errorMessage("404 - Page not found");
-                emit closeRequest(this, 404);
-            }
-            else {
-                closeWhenFinished = true;
-            }
+    switch (err) {
+    case 404:
+        // Keep the tab available when failed/missing attachments need attention.
+        if (isDownloadFinished() && failedImageUrls.isEmpty()
+                && missingImageUrls.isEmpty()) {
+            stop();
+            setTabTitle("Thread 404'ed");
+            emit errorMessage("404 - Thread not found");
+            emit closeRequest(this, 404);
+        } else {
+            closeWhenFinished = true;
+            setStatus("Thread removed; pending attachments may still finish");
         }
         break;
-
+    case 503:
+        setStatus("Thread request failed; retry with rescan");
+        emit errorMessage("Thread request failed after retries: " + uri);
+        break;
     case 999:
         setTabTitle("Banned");
         emit errorMessage("You are banned");
         break;
-
     default:
-        QLOG_ERROR() << "ImageOverview :: Unhandled error (" << url.toString() << "," << err << ")";
+        QLOG_WARN() << "UIImageOverview :: Thread request error" << uri << err;
+        emit errorMessage("Thread request error: " + uri);
         break;
     }
 }
@@ -766,8 +796,9 @@ bool UIImageOverview::isDownloadFinished() {
 
     ret = false;
 
-    if (getDownloadedImagesCount() == getTotalImagesCount()) {
-        ret=true;
+    if (getDownloadedImagesCount() + failedImageUrls.size()
+            + missingImageUrls.size() >= getTotalImagesCount()) {
+        ret = true;
     }
 
     return ret;
@@ -816,45 +847,49 @@ void UIImageOverview::processRequestResponse(QUrl url, QByteArray ba, bool cache
     QLOG_TRACE() << "UIImageOverview :: Got response for " << url.toString() << ":" << QString(ba);
     if (!_threadBlocked) {
         if (isImage(url)) {
-            QFile f;
-            QRegExp rx(__IMAGEFILE_REGEXP__, Qt::CaseInsensitive, QRegExp::RegExp2);
-            QStringList res;
-            int pos;
-
-            pos = 0;
-
-            pos = rx.indexIn(requestURI);
-            res = rx.capturedTexts();
-
-            if (pos != -1) {
-                f.setFileName(getSavepath()+"/"+res.at(1)+res.at(2));
-
-                if (ui->cbOriginalFilename->isChecked()) {
-                    _IMAGE tmp;
-
-                    for (int i=0; i<images.count(); i++) {
-                        if (images.at(i).largeURI.endsWith("/"+res.at(1)+res.at(2))) {
-                            tmp = images.at(i);
-
-                            f.setFileName(getSavepath()+"/"+tmp.originalFilename);
-                            break;
-                        }
-                    }
-                }
-
-                f.open(QIODevice::ReadWrite);
-                bytesWritten = f.write(ba);
-                f.close();
-
-                if (bytesWritten == ba.size()) {
-                    createThumbnail(f.fileName());
-                    setCompleted(requestURI, f.fileName());
-                }
-                else {
-                    QLOG_ERROR() << "UIImageOverview :: Couldn't save file from URI " << url.toString();
+            const QRegExp rx(__IMAGEFILE_REGEXP__, Qt::CaseInsensitive, QRegExp::RegExp2);
+            if (rx.indexIn(requestURI) == -1) {
+                errorHandler(url, 503);
+                return;
+            }
+            const QString filenamePart = rx.cap(1) + rx.cap(2);
+            QString destination = getSavepath() + "/" + filenamePart;
+            qint64 expectedSize = 0;
+            for (int i = 0; i < images.count(); ++i) {
+                if (images.at(i).largeURI == requestURI) {
+                    const _IMAGE image = images.at(i);
+                    expectedSize = image.expectedSize;
+                    if (ui->cbOriginalFilename->isChecked())
+                        destination = getSavepath() + "/" + image.originalFilename;
+                    break;
                 }
             }
 
+            if (ba.isEmpty() || (expectedSize > 0 && ba.size() != expectedSize)) {
+                QLOG_WARN() << "UIImageOverview :: Incomplete attachment" << requestURI
+                            << "expected" << expectedSize << "received" << ba.size();
+                errorHandler(url, 503);
+                return;
+            }
+
+            // QSaveFile writes to a temporary file and atomically replaces the
+            // destination on commit. No truncated attachment keeps its final name.
+            QSaveFile file(destination);
+            if (!file.open(QIODevice::WriteOnly)) {
+                QLOG_ERROR() << "UIImageOverview :: Cannot open destination" << destination
+                             << file.errorString();
+                errorHandler(url, 503);
+                return;
+            }
+            bytesWritten = file.write(ba);
+            if (bytesWritten != ba.size() || !file.commit()) {
+                file.cancelWriting();
+                QLOG_ERROR() << "UIImageOverview :: Cannot complete attachment" << destination;
+                errorHandler(url, 503);
+                return;
+            }
+            createThumbnail(destination);
+            setCompleted(requestURI, destination);
         }
         else {
             setStatus("Parsing");
@@ -948,6 +983,8 @@ void UIImageOverview::setCompleted(QString uri, QString filename) {
             tmp = images.at(i);
             tmp.downloaded = true;
             tmp.savedAs = filename;
+            failedImageUrls.remove(uri);
+            missingImageUrls.remove(uri);
 
             images.replace(i,tmp);
 
@@ -974,50 +1011,41 @@ bool UIImageOverview::isImage(QUrl url) {
 }
 
 bool UIImageOverview::getNextImage(QString* s) {
-    int i;
-    bool ret;
-    _IMAGE tmp;
-    QFile f;
-    QRegExp rx(__IMAGEFILE_REGEXP__, Qt::CaseInsensitive, QRegExp::RegExp2);
-    QStringList res;
-    int pos;
+    if (!downloading)
+        return false;
 
-    ret = false;
+    const QRegExp rx(__IMAGEFILE_REGEXP__, Qt::CaseInsensitive, QRegExp::RegExp2);
+    for (int i = 0; i < images.count(); ++i) {
+        _IMAGE image = images.at(i);
+        if (image.downloaded || image.requested
+                || failedImageUrls.contains(image.largeURI)
+                || missingImageUrls.contains(image.largeURI))
+            continue;
 
-    if (downloading) {
-        for (i=0; i<images.length(); i++) {
-            if (!images.at(i).downloaded && !images.at(i).requested) {
-                tmp = images.at(i);
-                tmp.requested = true;
-                images.replace(i,tmp);
-
-                // Check if file already exists in destination dir
-                pos = 0;
-
-                pos = rx.indexIn(tmp.largeURI);
-                res = rx.capturedTexts();
-
-                if (pos != -1) {
-                    f.setFileName(getSavepath()+res.at(0));
-                }
-
-                if (f.exists()) {
-                    tmp.downloaded = true;
-                    images.replace(i, tmp);
-
-                    createThumbnail(f.fileName());
-                    setCompleted(tmp.largeURI, f.fileName());
-                }
-                else {
-                    *s = tmp.largeURI;
-                    ret = true;
-                    break;
-                }
-            }
+        QString destination;
+        if (ui->cbOriginalFilename->isChecked()) {
+            destination = getSavepath() + "/" + image.originalFilename;
+        } else if (rx.indexIn(image.largeURI) >= 0) {
+            destination = getSavepath() + "/" + rx.cap(1) + rx.cap(2);
         }
-    }
 
-    return ret;
+        if (!destination.isEmpty()) {
+            const QFileInfo existing(destination);
+            if (existing.isFile() && existing.size() > 0
+                    && (image.expectedSize <= 0 || existing.size() == image.expectedSize)) {
+                createThumbnail(destination);
+                setCompleted(image.largeURI, destination);
+                continue;
+            }
+            // Invalid existing files are overwritten atomically only after
+            // receiving the complete replacement from the server.
+        }
+        image.requested = true;
+        images.replace(i, image);
+        *s = image.largeURI;
+        return true;
+    }
+    return false;
 }
 
 bool UIImageOverview::selectParser(QUrl url) {
@@ -1050,10 +1078,8 @@ void UIImageOverview::mergeImageList(QList<_IMAGE> list) {
     if (imagesAdded) {
         download(true);
     }
-    else {
-        if (isDownloadFinished()) {
-            download(false);
-        }
+    else if (isDownloadFinished()) {
+        download(false);
     }
 
     updateDownloadStatus();
@@ -1074,6 +1100,22 @@ bool UIImageOverview::addImage(_IMAGE img) {
         k = 2;
         for (i=0; i<images.length(); i++) {
             if (images.at(i).largeURI == img.largeURI) {
+                // A later rescan may reveal an old incomplete on-disk file.
+                _IMAGE existing = images.at(i);
+                if (img.expectedSize > 0)
+                    existing.expectedSize = img.expectedSize;
+                if (existing.downloaded && !existing.savedAs.isEmpty()) {
+                    const QFileInfo onDisk(existing.savedAs);
+                    if (!onDisk.isFile() || onDisk.size() <= 0
+                            || (existing.expectedSize > 0
+                                && onDisk.size() != existing.expectedSize)) {
+                        existing.downloaded = false;
+                        existing.requested = false;
+                        images.replace(i, existing);
+                        return true;
+                    }
+                }
+                images.replace(i, existing);
                 alreadyInList = true;
                 break;
             }
@@ -1112,7 +1154,9 @@ bool UIImageOverview::addImage(_IMAGE img) {
                 }
             }
 
-            if (f.exists()) {
+            if (f.exists() && QFileInfo(f.fileName()).size() > 0
+                    && (img.expectedSize <= 0
+                        || QFileInfo(f.fileName()).size() == img.expectedSize)) {
                 img.downloaded = true;
                 fileExists = true;
                 img.savedAs = f.fileName();
@@ -1161,39 +1205,38 @@ bool UIImageOverview::checkForExistingThread(QString s) {
 }
 
 void UIImageOverview::updateDownloadStatus() {
-    int d, t;
+    const int downloaded = getDownloadedImagesCount();
+    const int total = getTotalImagesCount();
+    const int failed = failedImageUrls.size();
+    const int missing = missingImageUrls.size();
 
-    d = getDownloadedImagesCount();
-    t = getTotalImagesCount();
-//    updateExpectedThumbnailCount();
+    retryFailedButton->setVisible(failed + missing > 0);
+    retryFailedButton->setText(QString("Retry Failed (%1)").arg(failed + missing));
 
-    if (!isDownloadFinished()) {
-        setTabTitle(QString("%1/%2").arg(d).arg(t));
+    if (failed + missing > 0) {
+        setTabTitle(QString("%1/%2 (%3 failed, %4 missing)")
+                    .arg(downloaded).arg(total).arg(failed).arg(missing));
+        setStatus(QString("Incomplete: %1 failed, %2 missing. Retry Failed to try again.")
+                  .arg(failed).arg(missing));
+        ui->progressBar->setVisible(true);
+        ui->progressBar->setMaximum(qMax(total, 1));
+        ui->progressBar->setValue(downloaded);
+    } else if (!isDownloadFinished()) {
+        setTabTitle(QString("%1/%2").arg(downloaded).arg(total));
         setStatus("downloading");
         ui->progressBar->setVisible(true);
-        ui->progressBar->setValue(d);
-        ui->progressBar->setMaximum(t);
-    }
-    else {
+        ui->progressBar->setMaximum(qMax(total, 1));
+        ui->progressBar->setValue(downloaded);
+    } else {
         ui->progressBar->setVisible(false);
-
-        QLOG_DEBUG() << "UIImageOverview :: updateDownloadStatus() :: item count: " << ui->listWidget->count() << "; expectedThumbnailCount " << expectedThumbnailCount;
-        if (missingThumbs.count() == 0) {
-            if (_cachedResult) {
-                setTabTitle("Cached");
-                setStatus("Cached");
-            }
-            else {
-                setTabTitle("Finished");
-                setStatus("Finished");
-            }
-        }
-        else {
+        if (missingThumbs.isEmpty()) {
+            setTabTitle(_cachedResult ? "Cached" : "Finished");
+            setStatus(_cachedResult ? "Cached" : "Finished");
+        } else {
             setTabTitle("Rendering");
             setStatus("Rendering");
         }
     }
-
     emit changed();
 }
 
@@ -1213,6 +1256,24 @@ void UIImageOverview::rebuildThumbnails() {
             createThumbnail(images.at(i).savedAs);
         }
     }
+}
+
+void UIImageOverview::retryFailedDownloads() {
+    const QSet<QString> retry = failedImageUrls + missingImageUrls;
+    if (retry.isEmpty())
+        return;
+    failedImageUrls.clear();
+    missingImageUrls.clear();
+    for (int i = 0; i < images.count(); ++i) {
+        _IMAGE image = images.at(i);
+        if (retry.contains(image.largeURI)) {
+            image.downloaded = false;
+            image.requested = false;
+            images.replace(i, image);
+        }
+    }
+    download(true);
+    updateDownloadStatus();
 }
 
 void UIImageOverview::reloadThread() {

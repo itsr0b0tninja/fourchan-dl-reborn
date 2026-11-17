@@ -8,6 +8,10 @@
 #include <QDesktopServices>
 #include <QStyle>
 #include <QSettings>
+#include <QSet>
+#include <QPushButton>
+#include <QSaveFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QCloseEvent>
 #include <QThread>
@@ -64,6 +68,9 @@ private:
     QTimer* thumbnailCheckTimer;
     QList<int> timeoutValues;
     QList<_IMAGE> images;
+    QSet<QString> failedImageUrls;
+    QSet<QString> missingImageUrls;
+    QPushButton* retryFailedButton;
     QSize iconSize;
     QAction* deleteFileAction;
     QAction* reloadFileAction;
@@ -128,6 +135,7 @@ private slots:
     void addShortcut();
     void rebuildThumbnails();
     void reloadThread();
+    void retryFailedDownloads();
 
     void startDownload(void);
     void stopDownload(void);

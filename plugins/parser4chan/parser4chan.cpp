@@ -85,6 +85,8 @@ ParsingStatus Parser4chan::parseHTML(QString html) {
                 img.originalFilename = post.value("filename").toString() + ext;
                 img.downloaded = false;
                 img.requested = false;
+                img.expectedSize = qMax(qint64(0),
+                    static_cast<qint64>(post.value("fsize").toDouble()));
                 _images.append(img);
             }
         }
