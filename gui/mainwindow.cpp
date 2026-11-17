@@ -70,6 +70,7 @@ MainWindow::MainWindow(QWidget *parent) :
     updateWidgetSettings();
 
     connect(requestHandler, SIGNAL(response(QUrl,QByteArray,bool)), this, SLOT(processRequestResponse(QUrl,QByteArray,bool)));
+    connect(requestHandler, SIGNAL(responseError(QUrl,int)), this, SLOT(githubUpdateCheckFailed(QUrl,int)));
 //    connect(requestHandler, SIGNAL(responseError(QUrl,int)), this, SLOT(handleRequestError(QUrl,int)));
 
     connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
@@ -732,6 +733,15 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
     }
 }
 
+void MainWindow::githubUpdateCheckFailed(QUrl url, int errorCode) {
+    if (!url.toString().contains("webupdate.xml"))
+        return;
+    if (errorCode == 404)
+        ui->statusBar->showMessage(tr("No GitHub release has been published yet."), 8000);
+    else
+        ui->statusBar->showMessage(tr("GitHub update check failed. Check your network connection."), 8000);
+}
+
 void MainWindow::checkForGitHubUpdates() {
     ui->statusBar->showMessage(tr("Checking GitHub Releases for updates..."), 5000);
     createSupervisedDownload(QUrl("https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest/download/webupdate.xml"));
@@ -748,6 +758,8 @@ void MainWindow::removeSupervisedDownload(QUrl url) {
 }
 
 void MainWindow::checkForUpdates(QString xml) {
+    runUpdate = false;
+    updateableComponents.clear();
     QRegExp rx(QString("<%1>([\\w\\W]+[^<])+</%1>").arg(UPDATE_TREE), Qt::CaseInsensitive, QRegExp::RegExp2);
     QRegExp rxFile("<file name=\"([^\\\"]+)\" filename=\"([^\\\"]+)\" type=\"([^\\\"]+)\" version=\"([\\w\\.]*)\" source=\"([\\w:\\-\\./\\+]+)\" target=\"([^\\\"]+)\" />", Qt::CaseInsensitive, QRegExp::RegExp2);
     int pos, posFile;
@@ -815,6 +827,10 @@ void MainWindow::checkForUpdates(QString xml) {
 
     if (runUpdate) {
         ui->menuBar->addAction(ui->actionAskForUpdate);
+        ui->statusBar->showMessage(tr("A GitHub update is available."), 8000);
+    } else {
+        ui->menuBar->removeAction(ui->actionAskForUpdate);
+        ui->statusBar->showMessage(tr("No newer GitHub release available."), 5000);
     }
     QLOG_TRACE() << "MainWindow :: " << xml;
 }
