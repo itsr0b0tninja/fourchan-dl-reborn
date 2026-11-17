@@ -24,7 +24,7 @@ public:
     bool cached(qint64);
     void freeRequest(qint64);
     void removeRequest(qint64);
-    qint64 requestDownload(RequestHandler* caller, QUrl url, int prio=0);
+    qint64 requestDownload(RequestHandler* caller, QUrl url, int prio=0, qint64 expectedSize=0);
     void getStatistics(int* files, float* kbytes);
     int getPendingRequests();
     int getRunningRequests();
