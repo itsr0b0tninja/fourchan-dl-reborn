@@ -97,6 +97,7 @@ int main(int argc, char *argv[])
 //    thumbnailThread.setPriority(QThread::NormalPriority);
 
     a.connect(&thumbnailThread, SIGNAL(started()), tnt, SLOT(go()));
+    a.connect(&thumbnailThread, SIGNAL(finished()), tnt, SLOT(deleteLater()));
     downloadManager->resumeDownloads();
 
 
@@ -109,10 +110,16 @@ int main(int argc, char *argv[])
     mainWindow->restoreTabs();
 
     a.connect(&a, SIGNAL(aboutToQuit()), mainWindow, SLOT(aboutToQuit()));
-    a.connect(mainWindow, SIGNAL(quitAll()), &thumbnailThread, SLOT(terminate()));
     a.connect(mainWindow, SIGNAL(quitAll()), downloadManager, SLOT(deleteLater()));
 
-    return a.exec();
+    const int exitCode = a.exec();
+
+    // QThread::quit() cannot unblock ThumbnailCreator::go() by itself.
+    // Ask the worker to stop, wake it and join the thread before destruction.
+    tnt->requestStop();
+    thumbnailThread.quit();
+    thumbnailThread.wait();
+    return exitCode;
 }
 
 void checkEnvironment() {
