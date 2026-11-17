@@ -38,6 +38,8 @@ bool checkIfNewerVersion(QString, QString);
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    // Portable mode: resolve settings.ini, thumbnails and updater paths beside the executable.
+    QDir::setCurrent(a.applicationDirPath());
     a.setApplicationName("4chan Downloader Reborn");
     a.setApplicationVersion("0.1");
     QSettings settings("settings.ini", QSettings::IniFormat);
