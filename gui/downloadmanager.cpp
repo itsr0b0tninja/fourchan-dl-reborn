@@ -425,11 +425,15 @@ void DownloadManager::handleError(qint64 uid, QNetworkReply* reply) {
                 settings->setValue("download_manager/video_cooldown_utc",
                                    deadline.toString(Qt::ISODate));
                 videoCooldownTimer->start(retryAfterSeconds * 1000);
+                emit videoCooldownChanged(videoCooldownUntil);
             }
             QLOG_WARN() << "DownloadManager :: Video CDN HTTP 429"
                         << "Retry-After:" << reply->rawHeader("Retry-After")
                         << "Content-Type:"
                         << reply->header(QNetworkRequest::ContentTypeHeader).toString();
+            QLOG_INFO() << "DownloadManager :: Next video retry at"
+                        << videoCooldownUntil.toLocalTime().toString("yyyy-MM-dd HH:mm:ss")
+                        << "(local time)";
             emit error(QString("4chan video rate limited; retry at %1 (local time)")
                 .arg(videoCooldownUntil.toLocalTime().toString("HH:mm:ss")));
         }
@@ -446,8 +450,10 @@ void DownloadManager::retryOrFail(qint64 uid, const QString &reason,
 
     if (rateLimited) {
         const int delay = qBound(1, retryAfterSeconds, 86400);
-        QLOG_INFO() << "DownloadManager :: HTTP 429 - retry scheduled in"
-                    << delay << "seconds; normal retry budget unchanged:" << dr->url();
+        QLOG_INFO() << "DownloadManager :: HTTP 429 - retry scheduled for"
+                    << QDateTime::currentDateTime().addSecs(delay).toString("yyyy-MM-dd HH:mm:ss")
+                    << "(local time, in" << delay
+                    << "seconds); normal retry budget unchanged:" << dr->url();
         dr->download_error(0, delay);
         reschedule(uid);
         return;
@@ -503,6 +509,7 @@ void DownloadManager::retryReady() {
             && QDateTime::currentDateTimeUtc() >= videoCooldownUntil) {
         videoCooldownUntil = QDateTime();
         settings->remove("download_manager/video_cooldown_utc");
+        emit videoCooldownChanged(QDateTime());
     }
     // Do not unpause a user-paused download queue merely because a retry is ready.
     processRequests();

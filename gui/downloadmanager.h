@@ -33,6 +33,7 @@ public:
     int getTotalRequests();
     int getFinishedRequests();
     void pauseDownloads();
+    QDateTime videoRetryDeadline() const { return videoCooldownUntil; }
     void setMaxPriority(int);
     QMap<qint64, QString> getPendingRequestsMap();
     QMap<qint64, QString> getRunningRequestsMap();
@@ -97,6 +98,7 @@ signals:
     void totalRequestsChanged(int);
     void finishedRequestsChanged(int);
     void error(QString);
+    void videoCooldownChanged(QDateTime);
 public slots:
     void loadSettings();
     void resumeDownloads();

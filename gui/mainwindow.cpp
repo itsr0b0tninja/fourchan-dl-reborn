@@ -33,6 +33,12 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(this, SIGNAL(removeFiles(QStringList)), thumbnailRemover, SLOT(removeFiles(QStringList)));
     ui->setupUi(this);
 
+    // A permanent status widget is not displaced by update checks or log messages.
+    videoRetryLabel = new QLabel(ui->statusBar);
+    videoRetryLabel->setToolTip(tr("The 4chan video CDN has requested a cooldown. Images and thread monitoring continue."));
+    ui->statusBar->addPermanentWidget(videoRetryLabel);
+    videoRetryLabel->hide();
+
     // Adding actions to menu bar
     ui->menuBar->addAction(ui->actionAdd_Tab);
     ui->menuBar->addAction(ui->actionAddMultipleTabs);
@@ -84,6 +90,9 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionPauseAll, SIGNAL(triggered()), this, SLOT(pauseAll()));
     connect(threadAdder, SIGNAL(addTab(QString)), this, SLOT(createTab(QString)));
     connect(downloadManager, SIGNAL(error(QString)), ui->statusBar, SLOT(showMessage(QString)));
+    connect(downloadManager, SIGNAL(videoCooldownChanged(QDateTime)),
+            this, SLOT(updateVideoCooldownStatus(QDateTime)));
+    updateVideoCooldownStatus(downloadManager->videoRetryDeadline());
     connect(downloadManager, SIGNAL(finishedRequestsChanged(int)), this, SLOT(updateDownloadProgress()));
     connect(downloadManager, SIGNAL(totalRequestsChanged(int)), this, SLOT(updateDownloadProgress()));
     connect(ui->tabWidget, SIGNAL(currentChanged(int)), this, SLOT(addThreadOverviewMark(int)));
@@ -207,6 +216,19 @@ void MainWindow::closeTab(int i) {
         QLOG_TRACE() << Q_FUNC_INFO << "Adding new tab, because no tab is left";
         addTab();
     }
+}
+
+void MainWindow::updateVideoCooldownStatus(QDateTime until) {
+    if (!until.isValid() || until <= QDateTime::currentDateTimeUtc()) {
+        videoRetryLabel->hide();
+        return;
+    }
+    const QDateTime localDeadline = until.toLocalTime();
+    const QString time = localDeadline.toString("dd MMM HH:mm:ss");
+    videoRetryLabel->setText(tr("Video retry: %1").arg(time));
+    videoRetryLabel->setToolTip(tr("4chan video downloads are rate limited until %1 (local time). New images and thread checks continue.")
+                                .arg(localDeadline.toString("yyyy-MM-dd HH:mm:ss")));
+    videoRetryLabel->show();
 }
 
 void MainWindow::displayError(QString s) {

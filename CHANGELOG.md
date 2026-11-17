@@ -1,5 +1,11 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.2.4 — Persistent video retry time
+- Show the exact local retry deadline in a permanent status-bar indicator while 4chan's video cooldown is active.
+- Restore that indicator on restart from the persisted cooldown deadline and hide it when the cooldown ends.
+- Log the absolute date and time of the next retry, as well as the relative delay.
+- Reuse the v0.2.2 parser and publish only the updated main executable and release metadata.
+
 ## v0.2.3 — HTTP 429 retry handling and incremental update
 - Honour Retry-After (seconds or HTTP-date), with a short margin and 24-hour cap.
 - HTTP 429 pauses downloads without consuming the ordinary retry budget.
