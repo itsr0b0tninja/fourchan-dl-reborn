@@ -58,6 +58,8 @@ jobs:
           mingw32-make -j2
           qmake-qt5 streaming-smoke.pro
           mingw32-make -j2
+          qmake-qt5 video-request-smoke.pro
+          mingw32-make -j2
           popd
           echo "Built executable files:"
           find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'
@@ -69,6 +71,7 @@ jobs:
           test -s portable/updater/upd4t3r.exe
           test -s portable/tls-smoke.exe
           test -s portable/streaming-smoke.exe
+          test -s portable/video-request-smoke.exe
 
       - name: Bundle the Windows Qt runtime
         shell: msys2 {0}
@@ -160,6 +163,17 @@ jobs:
             throw "Streaming file smoke test failed (exit code $LASTEXITCODE)."
           }
           Remove-Item "$root\streaming-smoke.exe"
+
+      - name: Verify 4chan video headers on Windows
+        shell: pwsh
+        run: |
+          $root = (Resolve-Path 'portable').Path
+          $env:PATH = "$root;$env:SystemRoot\System32;$env:SystemRoot"
+          & "$root\video-request-smoke.exe"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Video request header test failed (exit code $LASTEXITCODE)."
+          }
+          Remove-Item "$root\video-request-smoke.exe"
 
       - name: Create downloadable portable ZIP
         shell: pwsh
