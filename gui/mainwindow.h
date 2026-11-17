@@ -139,6 +139,7 @@ private slots:
     void getConsoleVersion();
     void askForUpdate();
     void checkForGitHubUpdates();
+    void githubUpdateCheckFailed(QUrl, int);
     void markAllViewed();
 
 signals:
