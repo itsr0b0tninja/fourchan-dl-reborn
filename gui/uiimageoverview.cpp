@@ -1,5 +1,7 @@
 ﻿#include "uiimageoverview.h"
 #include "ui_uiimageoverview.h"
+#include <QHBoxLayout>
+#include <QFrame>
 
 UIImageOverview::UIImageOverview(QWidget *parent) :
     QWidget(parent),
@@ -21,6 +23,24 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
 
     ui->setupUi(this);
 
+    // These controls live beside the thread rescan settings, above thumbnails.
+    videoOverrideCombo = new QComboBox(this);
+    videoOverrideCombo->addItem(tr("Use global setting"), 0);
+    videoOverrideCombo->addItem(tr("Download videos"), 1);
+    videoOverrideCombo->addItem(tr("Skip videos"), 2);
+    videoOverrideCombo->setToolTip(tr("Override the global MP4/WebM download setting for this thread."));
+    ui->horizontalLayout_2->insertWidget(2, new QLabel(tr("Videos:"), this));
+    ui->horizontalLayout_2->insertWidget(3, videoOverrideCombo);
+
+    QFrame* infoBox = new QFrame(this);
+    infoBox->setFrameShape(QFrame::StyledPanel);
+    QHBoxLayout* infoLayout = new QHBoxLayout(infoBox);
+    infoLayout->setContentsMargins(8, 3, 8, 3);
+    attachmentInfoLabel = new QLabel(tr("Images 0/0   Videos 0/0   |   Total 0/0"), infoBox);
+    attachmentInfoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    infoLayout->addWidget(attachmentInfoLabel);
+    ui->gridLayout_3->addWidget(infoBox, 3, 0);
+
     retryFailedButton = new QPushButton(tr("Retry Failed"), this);
     retryFailedButton->setToolTip(tr("Retry failed or missing attachments without re-downloading successful files"));
     ui->horizontalLayout_3->insertWidget(2, retryFailedButton);
@@ -41,6 +61,7 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
     thumbnailsizeLocked = false;
     closeWhenFinished = false;
     downloading = false;
+    running = false;
     nextImageSearchIndex = 0;
 
     deleteFileAction = new QAction(QString("Delete File"), this);
@@ -61,6 +82,8 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
         ui->leURI->setText(clipboard->text());
     }
 
+    connect(videoOverrideCombo, SIGNAL(currentIndexChanged(int)),
+            this, SLOT(videoOverrideChanged(int)));
     connect(requestHandler, SIGNAL(responseError(QUrl, int)), this, SLOT(errorHandler(QUrl, int)));
     connect(requestHandler, SIGNAL(response(QUrl, QByteArray, bool)), this, SLOT(processRequestResponse(QUrl, QByteArray, bool)));
     connect(requestHandler, SIGNAL(responseFile(QUrl, QString)), this, SLOT(processDownloadedFile(QUrl, QString)));
@@ -95,6 +118,7 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
     expectedThumbnailCount = 0;
     thumbnailCount = 0;
     thumbnailCountLastViewed = 0;
+    updateAttachmentInfo();
 }
 
 UIImageOverview::~UIImageOverview()
@@ -498,20 +522,17 @@ QString UIImageOverview::getStatus() {
     if (!running || _threadBlocked)
         return _status;
 
-    const QDateTime now = QDateTime::currentDateTimeUtc();
     if (_status.compare("downloading", Qt::CaseInsensitive) == 0) {
+        // Only show Finished (retry ...) if *all* outstanding attachments
+        // in this thread are waiting. Active images keep it Downloading.
         const QDateTime retry = downloadManager->nextRetryForAttachments(imageIndexByUrl);
-        if (retry.isValid() && retry > now)
-            return QString("Downloading (scheduled retry %1)")
+        if (retry.isValid() && retry > QDateTime::currentDateTimeUtc())
+            return QString("Finished (retry %1)")
                     .arg(retry.toLocalTime().toString("HH:mm:ss"));
         return "Downloading";
     }
-    if (_status == "Finished" && ui->cbRescan->isChecked() && timer->isActive()) {
-        const int remaining = timer->remainingTime();
-        if (remaining >= 0)
-            return QString("Finished (scheduled retry %1)")
-                    .arg(QDateTime::currentDateTime().addMSecs(remaining).toString("HH:mm:ss"));
-    }
+    // Finished means complete and still monitoring; periodic rescans are
+    // not download retries and must not be shown as such.
     return _status;
 }
 
@@ -534,6 +555,7 @@ QString UIImageOverview::getValues(void) {
     list << QString("%1").arg(ui->cbOriginalFilename->isChecked());
     list << QString("%1").arg(running);
     list << QString("%1").arg(_threadBlocked);
+    list << QString("%1").arg(videoOverrideCombo->currentIndex());
 
     ret = list.join(";;");
 
@@ -564,6 +586,8 @@ void UIImageOverview::setValues(QString s) {
     }
 
     ui->cbOriginalFilename->setChecked((bool)list.value(4).toInt());
+    // Older saved sessions have seven fields, so inherit global by default.
+    videoOverrideCombo->setCurrentIndex(qBound(0, list.value(7, "0").toInt(), 2));
 
     if (list.value(6).toInt() == 1) {
         ui->btnBlockThread->setChecked(true);
@@ -810,16 +834,8 @@ bool UIImageOverview::getUrlOfFilename(QString filename, QString * url) {
 }
 
 bool UIImageOverview::isDownloadFinished() {
-    bool ret;
-
-    ret = false;
-
-    if (getDownloadedImagesCount() + failedImageUrls.size()
-            + missingImageUrls.size() >= getTotalImagesCount()) {
-        ret = true;
-    }
-
-    return ret;
+    // Skipped videos remain in the total without blocking the active work.
+    return pendingEnabledCount() == 0;
 }
 
 void UIImageOverview::deleteAllThumbnails() {
@@ -1036,6 +1052,7 @@ bool UIImageOverview::getNextImage(QString* s) {
         nextImageSearchIndex = i + 1;
         _IMAGE image = images.at(i);
         if (image.downloaded || image.requested
+                || (!videosAllowed() && isVideoAttachment(image.largeURI))
                 || failedImageUrls.contains(image.largeURI)
                 || missingImageUrls.contains(image.largeURI))
             continue;
@@ -1198,7 +1215,88 @@ bool UIImageOverview::checkForExistingThread(QString s) {
     return ret;
 }
 
+bool UIImageOverview::isVideoAttachment(const QString &uri) const {
+    const QString path = QUrl(uri).path().toLower();
+    return path.endsWith(".mp4") || path.endsWith(".webm");
+}
+
+bool UIImageOverview::videosAllowed() const {
+    const int overrideIndex = videoOverrideCombo->currentIndex();
+    if (overrideIndex == 1)
+        return true;
+    if (overrideIndex == 2)
+        return false;
+    return settings->value("download_manager/download_videos", true).toBool();
+}
+
+void UIImageOverview::updateAttachmentInfo() {
+    int imageTotal = 0;
+    int imageDownloaded = 0;
+    int videoTotal = 0;
+    int videoDownloaded = 0;
+    foreach (const _IMAGE &image, images) {
+        if (isVideoAttachment(image.largeURI)) {
+            ++videoTotal;
+            if (image.downloaded)
+                ++videoDownloaded;
+        } else {
+            ++imageTotal;
+            if (image.downloaded)
+                ++imageDownloaded;
+        }
+    }
+    const int skipped = videosAllowed() ? 0 : videoTotal - videoDownloaded;
+    QString videoDetail;
+    if (skipped > 0)
+        videoDetail = QString(" (%1 skipped)").arg(skipped);
+    attachmentInfoLabel->setText(
+        QString("Images %1/%2    Videos %3/%4%5    |    Total %6/%7")
+            .arg(imageDownloaded).arg(imageTotal)
+            .arg(videoDownloaded).arg(videoTotal).arg(videoDetail)
+            .arg(imageDownloaded + videoDownloaded).arg(imageTotal + videoTotal));
+}
+
+int UIImageOverview::pendingEnabledCount() const {
+    int remaining = 0;
+    foreach (const _IMAGE &image, images) {
+        if (!image.downloaded && !failedImageUrls.contains(image.largeURI)
+                && !missingImageUrls.contains(image.largeURI)
+                && (videosAllowed() || !isVideoAttachment(image.largeURI)))
+            ++remaining;
+    }
+    return remaining;
+}
+
+void UIImageOverview::videoOverrideChanged(int) {
+    videoSettingChanged();
+}
+
+void UIImageOverview::videoSettingChanged() {
+    updateAttachmentInfo();
+    if (!running || _threadBlocked || !iParser)
+        return;
+
+    if (!videosAllowed()) {
+        // Cancel outstanding video work, including currently active requests.
+        // This leaves downloaded files and the discovered attachment count intact.
+        for (int i = 0; i < images.size(); ++i) {
+            _IMAGE image = images.at(i);
+            if (!image.downloaded && image.requested
+                    && isVideoAttachment(image.largeURI)) {
+                requestHandler->cancel(QUrl(image.largeURI));
+                image.requested = false;
+                images.replace(i, image);
+            }
+        }
+    } else {
+        // Previously skipped videos are in images[] and are eligible again.
+        download(true);
+    }
+    updateDownloadStatus();
+}
+
 void UIImageOverview::updateDownloadStatus() {
+    updateAttachmentInfo();
     const int downloaded = getDownloadedImagesCount();
     const int total = getTotalImagesCount();
     const int failed = failedImageUrls.size();
@@ -1278,6 +1376,9 @@ void UIImageOverview::reloadThread() {
     for (int i=0; i<images.length(); i++) {
         if (images.at(i).downloaded) {
             t = images.at(i);
+            // A reload must not delete an existing video while videos are off.
+            if (!videosAllowed() && isVideoAttachment(t.largeURI))
+                continue;
 
             t.downloaded = false;
             t.requested = false;

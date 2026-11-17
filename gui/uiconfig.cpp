@@ -8,6 +8,10 @@ UIConfig::UIConfig(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    downloadVideosCheckBox = new QCheckBox(tr("Download MP4 and WebM videos by default"), this);
+    downloadVideosCheckBox->setToolTip(tr("Individual threads can override this setting beside their rescan options."));
+    ui->formLayout->addRow(tr("Videos"), downloadVideosCheckBox);
+
     _removing_thumbnails = false;
 
     settings = new QSettings("settings.ini", QSettings::IniFormat);
@@ -145,6 +149,7 @@ void UIConfig::loadSettings(void) {
     settings->endGroup();
 
     settings->beginGroup("download_manager");
+        downloadVideosCheckBox->setChecked(settings->value("download_videos", true).toBool());
         ui->sbConcurrentDownloads->setValue(settings->value("concurrent_downloads",20).toInt());
         ui->sbDownloadTimeoutInitial->setValue(settings->value("initial_timeout",30).toInt());
         ui->sbDownloadTimeoutInbetween->setValue(settings->value("running_timeout",20).toInt());
@@ -224,6 +229,7 @@ void UIConfig::accept(void) {
     settings->endGroup();
 
     settings->beginGroup("download_manager");
+        settings->setValue("download_videos", downloadVideosCheckBox->isChecked());
         settings->setValue("concurrent_downloads", ui->sbConcurrentDownloads->value());
         settings->setValue("initial_timeout", ui->sbDownloadTimeoutInitial->value());
         settings->setValue("running_timeout", ui->sbDownloadTimeoutInbetween->value());

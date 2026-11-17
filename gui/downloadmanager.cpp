@@ -508,13 +508,21 @@ void DownloadManager::reschedule(qint64 uid) {
 
 QDateTime DownloadManager::nextRetryForAttachments(
         const QHash<QString, int> &urlIndex) const {
-    QDateTime next;
+    // Show Finished (retry ...) only when EVERY outstanding attachment
+    // in this thread is waiting. One active or ready image means Downloading.
+    QDateTime earliest;
     const QDateTime now = QDateTime::currentDateTimeUtc();
+    bool foundOutstanding = false;
     QHash<qint64, DownloadRequest*>::const_iterator it = requestList.constBegin();
     for (; it != requestList.constEnd(); ++it) {
         DownloadRequest* request = it.value();
-        if (!request || !urlIndex.contains(request->url().toString()))
+        if (!request || !urlIndex.contains(request->url().toString())
+                || request->finished())
             continue;
+        foundOutstanding = true;
+        if (request->processing())
+            return QDateTime();
+
         QDateTime until;
         if (request->paused() && request->retryDeadline() > now)
             until = request->retryDeadline();
@@ -522,10 +530,12 @@ QDateTime DownloadManager::nextRetryForAttachments(
                 && videoCooldownUntil > now
                 && (!until.isValid() || videoCooldownUntil > until))
             until = videoCooldownUntil;
-        if (until.isValid() && (!next.isValid() || until < next))
-            next = until;
+        if (!until.isValid())
+            return QDateTime();
+        if (!earliest.isValid() || until < earliest)
+            earliest = until;
     }
-    return next;
+    return foundOutstanding ? earliest : QDateTime();
 }
 
 void DownloadManager::retryReady() {

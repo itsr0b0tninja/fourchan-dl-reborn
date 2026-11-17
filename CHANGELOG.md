@@ -1,5 +1,16 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.2.6 — Global/per-thread video settings, attachment counts and corrected thread status
+- Add a Download Manager preference to download MP4/WebM videos by default (enabled).
+- Add per-thread video override next to the Rescan Thread controls: global / download / skip, saved with thread session settings.
+- Add a compact, always-visible attachment breakdown above thumbnails: downloaded images, downloaded videos, skipped video count and total downloaded/discovered.
+- Skipped videos remain in thread totals but do not block Finished or count as downloaded, missing or failed.
+- Apply changes immediately: cancel pending video transfers when disabled, preserve completed videos, and queue previously skipped files when re-enabled.
+- Keep ordinary image downloads and thread rescans running during video rate-limit cooldowns.
+- Thread Overview statuses: Downloading for runnable work; Rendering for pending thumbnails; Finished for completed monitored threads; Finished (retry HH:mm:ss) only when all outstanding attachments are awaiting a retry. Preserve 404/stopped statuses.
+- Do not label periodic thread monitoring as a retry and do not display a separate cooldown label in the main status bar.
+- Retain thumbnail completion fixes and publish as a small incremental executable update.
+
 ## v0.2.5 — Thread Overview retry statuses and rendering completion
 - Show per-thread attachment retries directly in the Thread Overview Status column: Downloading (scheduled retry HH:mm:ss).
 - When all media is downloaded, display Finished (scheduled retry HH:mm:ss) if monitoring is due to rescan.

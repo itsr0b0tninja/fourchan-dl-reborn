@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QSettings>
+#include <QCheckBox>
 #include <QFileDialog>
 #include "uilisteditor.h"
 #include "dialogfoldershortcut.h"
@@ -26,6 +27,7 @@ public:
 private:
     Ui::UIConfig *ui;
     QSettings* settings;
+    QCheckBox* downloadVideosCheckBox;
     UIListEditor* timeoutValueEditor;
     DialogFolderShortcut* dialogFolderShortcut;
     bool _removing_thumbnails;

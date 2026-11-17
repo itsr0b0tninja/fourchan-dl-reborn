@@ -11,6 +11,8 @@
 #include <QSet>
 #include <QHash>
 #include <QPushButton>
+#include <QComboBox>
+#include <QLabel>
 #include <QSaveFile>
 #include <QFileInfo>
 #include <QImage>
@@ -76,6 +78,8 @@ private:
     QSet<QString> failedImageUrls;
     QSet<QString> missingImageUrls;
     QPushButton* retryFailedButton;
+    QComboBox* videoOverrideCombo;
+    QLabel* attachmentInfoLabel;
     QSize iconSize;
     QAction* deleteFileAction;
     QAction* reloadFileAction;
@@ -109,6 +113,10 @@ private:
     void removeSupervisedDownload(QUrl);
     bool getUrlOfFilename(QString filename, QString * url);
     bool isDownloadFinished();
+    bool isVideoAttachment(const QString &uri) const;
+    bool videosAllowed() const;
+    void updateAttachmentInfo();
+    int pendingEnabledCount() const;
     void deleteAllThumbnails();
     bool getNextImage(QString* s);
     bool selectParser(QUrl url=QUrl());
@@ -141,6 +149,7 @@ private slots:
     void rebuildThumbnails();
     void reloadThread();
     void retryFailedDownloads();
+    void videoOverrideChanged(int index);
 
     void startDownload(void);
     void stopDownload(void);
@@ -160,6 +169,7 @@ public slots:
     void addThumbnails(QString);
     void start(void);
     void stop(void);
+    void videoSettingChanged();
     bool checkForExistingThread(QString s="");
 
 signals:

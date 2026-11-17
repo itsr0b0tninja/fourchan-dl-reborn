@@ -150,6 +150,7 @@ int MainWindow::addTab() {
     connect(w, SIGNAL(createTabRequest(QString)), this, SLOT(createTab(QString)));
     connect(w, SIGNAL(removeFiles(QStringList)), this, SIGNAL(removeFiles(QStringList)));
     connect(w, SIGNAL(changed()), this, SLOT(scheduleOverviewUpdate()));
+    connect(uiConfig, SIGNAL(configurationChanged()), w, SLOT(videoSettingChanged()));
 
     changeTabTitle(w, "idle");
 
