@@ -463,7 +463,7 @@ void MainWindow::askForUpdate() {
 
         QLOG_INFO() << "MainWindow :: Starting updater " << fi.absoluteFilePath();
 
-        if (process.startDetached(QString("\"%1\"").arg(fi.absoluteFilePath()))) {
+        if (QProcess::startDetached(fi.absoluteFilePath(), QStringList(), QCoreApplication::applicationDirPath())) {
             ui->statusBar->showMessage("Starting updater");
         }
         else {
@@ -497,7 +497,7 @@ void MainWindow::getUpdaterVersion() {
     QLOG_INFO() << "MainWindow :: Starting updater " << fi.absoluteFilePath();
 
     checkUpdaterVersion = true;
-    if (process.startDetached(QString("\"%1\"").arg(fi.absoluteFilePath()))) {
+    if (QProcess::startDetached(fi.absoluteFilePath(), QStringList(), QCoreApplication::applicationDirPath())) {
         ui->statusBar->showMessage("Starting updater for version check");
     }
     else {
