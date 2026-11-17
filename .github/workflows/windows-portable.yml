@@ -1,0 +1,71 @@
+name: Windows portable build (experimental)
+
+on:
+  push:
+    branches:
+      - development/**
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-windows:
+    name: Build fourchan-dl for Windows x64 (Qt 5)
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Qt 5 and MinGW toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-qt5-base
+            mingw-w64-x86_64-qt5-tools
+            mingw-w64-x86_64-qt5-svg
+            mingw-w64-x86_64-qt5-imageformats
+
+      - name: Build GUI and 4chan parser
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          mkdir -p portable/plugins
+          pushd gui
+          qmake-qt5 gui.pro 'TARGET=fourchan-dl' 'DESTDIR=../portable'
+          mingw32-make -j2
+          popd
+          pushd plugins/parser4chan
+          qmake-qt5 parser4chan.pro 'TARGET=parser4chan' 'DESTDIR=../../portable/plugins'
+          mingw32-make -j2
+          popd
+          test -s portable/fourchan-dl.exe
+          test -s portable/plugins/parser4chan.dll
+
+      - name: Bundle required runtime libraries
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          windeployqt-qt5 --release --no-translations portable/fourchan-dl.exe
+          cp -v /mingw64/bin/libgcc_s_seh-1.dll portable/
+          cp -v /mingw64/bin/libstdc++-6.dll portable/
+          cp -v /mingw64/bin/libwinpthread-1.dll portable/
+          cp -v LICENSE portable/LICENSE.txt
+          printf '%s\n' 'fourchan-dl reborn - EXPERIMENTAL Windows portable build' 'Extract the entire ZIP into a NEW folder. Do not overwrite your old installation.' 'Run fourchan-dl.exe. Download data and settings are kept separately from your old installation.' 'This build includes the 4chan parser only; legacy updater and other imageboard plugins are not packaged.' > portable/PORTABLE-BUILD-NOTES.txt
+          test -s portable/platforms/qwindows.dll
+          find portable -maxdepth 2 -type f | sort
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: fourchan-dl-reborn-win64-portable-experimental
+          path: portable/
+          if-no-files-found: error
+          retention-days: 14
