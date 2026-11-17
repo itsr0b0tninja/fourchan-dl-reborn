@@ -5,6 +5,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QAbstractSpinBox>
+#include <QMessageBox>
 #include "apptheme.h"
 
 UIConfig::UIConfig(QWidget *parent) :
@@ -13,9 +15,9 @@ UIConfig::UIConfig(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    // Two explicit themes only. Light remains the default and retains the
-    // existing native Windows style; Dark uses the charcoal Fusion palette.
+    // Light and Dark share the same Qt Fusion control style.
     themeSelector = new QComboBox(this);
+    themeSelector->setObjectName(QStringLiteral("themeSelector"));
     themeSelector->addItem(tr("Light"), QStringLiteral("light"));
     themeSelector->addItem(tr("Dark"), QStringLiteral("dark"));
     themeSelector->setToolTip(tr("Changes apply when you save Settings, without restarting."));
@@ -59,6 +61,7 @@ UIConfig::UIConfig(QWidget *parent) :
     connect(updatePeriodicCheckBox, SIGNAL(toggled(bool)), updateIntervalDaysSpinBox, SLOT(setEnabled(bool)));
 
     _removing_thumbnails = false;
+    loadingSettings = false;
 
     settings = new QSettings("settings.ini", QSettings::IniFormat);
     timeoutValueEditor = new UIListEditor(this);
@@ -76,7 +79,18 @@ UIConfig::UIConfig(QWidget *parent) :
     loadShortcuts();
     refreshThemeWarning();
 
-    connect(timeoutValueEditor, SIGNAL(valuesChanged()), this, SLOT(loadSettings()));
+    // Persist navigation immediately without marking ordinary preferences dirty.
+    const int lastTab = settings->value("ui/configuration_tab", 0).toInt();
+    ui->tabWidget->setCurrentIndex(qBound(0, lastTab, ui->tabWidget->count() - 1));
+    connect(ui->tabWidget, SIGNAL(currentChanged(int)),
+            this, SLOT(rememberSettingsTab(int)));
+    connectApplyTracking();
+    connect(ui->btnApply, SIGNAL(clicked()), this, SLOT(applySettings()));
+
+    // The timeout subdialog saves its own values, without overwriting other
+    // pending edits in this Settings window.
+    connect(timeoutValueEditor, SIGNAL(valuesChanged()),
+            this, SLOT(timeoutValuesChanged()));
     connect(ui->cbUseProxy, SIGNAL(toggled(bool)), this, SLOT(toggleProxy(bool)));
     connect(ui->listWidget, SIGNAL(itemDoubleClicked(QListWidgetItem*)), this, SLOT(editShortcutItem(QListWidgetItem*)));
     connect(folderShortcuts, SIGNAL(shortcutsChanged()), this, SLOT(loadShortcuts()));
@@ -92,8 +106,8 @@ UIConfig::~UIConfig()
 }
 
 void UIConfig::loadSettings(void) {
-    QStringList sl;
-    int index;
+    loadingSettings = true;
+    settings->sync();
     bool b;
 
     settings->beginGroup("updater");
@@ -139,45 +153,7 @@ void UIConfig::loadSettings(void) {
                                                         .arg("tncache")).toString());
     ui->sbThumbnailTTL->setValue(settings->value("thumbnail_TTL", 60).toInt());
 
-    sl = settings->value("timeout_values", (QStringList()<<"300"<<"600")).toStringList();
-    ui->cbRescanInterval->clear();
-    ui->cbRescanInterval->addItem("Never", 0);
-    foreach (QString s, sl) {
-        int value;
-        int i;
-        bool ok;
-        QString text;
-
-        i = s.toInt(&ok);
-        if (ok) {
-            if (i > 60 && ((i%60) == 0)) {              // Display as minutes
-                if (i > 3600 && ((i%3600) == 0)) {      // Display as hours
-                    if (i > 86400 && ((i%86400)==0)) {  // Display as days
-                        value = i/86400;
-                        text = "days";
-                    }
-                    else {
-                        value = i/3600;
-                        text = "hours";
-                    }
-                }
-                else {
-                    value = i/60;
-                    text = "minutes";
-                }
-            }
-            else {
-                value = i;
-                text = "seconds";
-            }
-
-            ui->cbRescanInterval->addItem(QString("every %1 %2").arg(value).arg(text), i);
-        }
-    }
-
-    index = ui->cbRescanInterval->findData(settings->value("default_timeout", 0).toInt());
-    if (index != -1) ui->cbRescanInterval->setCurrentIndex(index);
-    else ui->cbRescanInterval->setCurrentIndex(0);
+    rebuildRescanIntervals(settings->value("default_timeout", 0).toInt());
 
     ui->cbCloseToTray->setChecked(settings->value("close_to_tray", false).toBool());
     ui->cbLoggingLevel->setCurrentIndex(settings->value("log_level",3).toInt());
@@ -223,16 +199,129 @@ void UIConfig::loadSettings(void) {
         if (agent.trimmed().isEmpty() || agent == "Wget/1.12")
             agent = QString::fromLatin1(FourchanRequestHeaders::defaultUserAgent());
         ui->leUserAgent->setText(agent);
+        // Avoid duplicated presets and overwriting a saved custom User-Agent.
+        const bool wasBlocked = ui->cmbUserAgent->blockSignals(true);
+        ui->cmbUserAgent->clear();
         ui->cmbUserAgent->addItems(userAgentStrings.keys());
+        ui->cmbUserAgent->blockSignals(wasBlocked);
     settings->endGroup();
 
     ui->sbUpdaterPort->setValue(settings->value("updater/updater_port", 60000).toInt());
     ui->sbApplicationPort->setValue(settings->value("updater/application_port", 60001).toInt());
 
     timeoutValueEditor->loadSettings();
+    loadingSettings = false;
+    captureAppliedValues();
+}
+
+void UIConfig::rebuildRescanIntervals(int selectedSeconds) {
+    const QStringList sl = settings->value(
+        "options/timeout_values", (QStringList() << "300" << "600")).toStringList();
+    ui->cbRescanInterval->clear();
+    ui->cbRescanInterval->addItem(tr("Never"), 0);
+    foreach (const QString &s, sl) {
+        bool ok = false;
+        const int seconds = s.toInt(&ok);
+        if (!ok)
+            continue;
+        int value = seconds;
+        QString unit = tr("seconds");
+        if (seconds > 60 && seconds % 60 == 0) {
+            if (seconds > 3600 && seconds % 3600 == 0) {
+                if (seconds > 86400 && seconds % 86400 == 0) {
+                    value = seconds / 86400;
+                    unit = tr("days");
+                } else {
+                    value = seconds / 3600;
+                    unit = tr("hours");
+                }
+            } else {
+                value = seconds / 60;
+                unit = tr("minutes");
+            }
+        }
+        ui->cbRescanInterval->addItem(tr("every %1 %2").arg(value).arg(unit), seconds);
+    }
+    const int match = ui->cbRescanInterval->findData(selectedSeconds);
+    ui->cbRescanInterval->setCurrentIndex(match >= 0 ? match : 0);
+}
+
+void UIConfig::timeoutValuesChanged() {
+    // The separate editor already persisted its interval list. Preserve all
+    // other unsaved Settings edits when refreshing just this dropdown.
+    const int selectedSeconds = ui->cbRescanInterval->currentData().toInt();
+    loadingSettings = true;
+    rebuildRescanIntervals(selectedSeconds);
+    loadingSettings = false;
+    updateApplyState();
+}
+
+void UIConfig::rememberSettingsTab(int index) {
+    settings->setValue("ui/configuration_tab", index);
+    settings->sync();
+}
+
+QMap<QWidget*, QVariant> UIConfig::readCurrentValues() const {
+    // Ignore the independently saved shortcut/timeout subdialogs.
+    QMap<QWidget*, QVariant> values;
+    const QList<QCheckBox*> checks = ui->tabWidget->findChildren<QCheckBox*>();
+    foreach (QCheckBox *widget, checks)
+        values.insert(widget, widget->isChecked());
+    const QList<QComboBox*> combos = ui->tabWidget->findChildren<QComboBox*>();
+    foreach (QComboBox *widget, combos) {
+        // The User-Agent preset picker is only a helper; leUserAgent is saved.
+        if (widget != ui->cmbUserAgent)
+            values.insert(widget, widget->currentData().isValid()
+                                      ? widget->currentData() : QVariant(widget->currentIndex()));
+    }
+    const QList<QSpinBox*> spins = ui->tabWidget->findChildren<QSpinBox*>();
+    foreach (QSpinBox *widget, spins)
+        values.insert(widget, widget->value());
+    const QList<QLineEdit*> edits = ui->tabWidget->findChildren<QLineEdit*>();
+    foreach (QLineEdit *widget, edits) {
+        if (qobject_cast<QAbstractSpinBox*>(widget->parentWidget()) ||
+            qobject_cast<QComboBox*>(widget->parentWidget()))
+            continue;
+        values.insert(widget, widget->text());
+    }
+    return values;
+}
+
+void UIConfig::captureAppliedValues() {
+    appliedValues = readCurrentValues();
+    ui->btnApply->setEnabled(false);
+}
+
+void UIConfig::updateApplyState() {
+    if (!loadingSettings)
+        ui->btnApply->setEnabled(readCurrentValues() != appliedValues);
+}
+
+void UIConfig::connectApplyTracking() {
+    const QList<QCheckBox*> checks = ui->tabWidget->findChildren<QCheckBox*>();
+    foreach (QCheckBox *widget, checks)
+        connect(widget, SIGNAL(toggled(bool)), this, SLOT(updateApplyState()));
+    const QList<QComboBox*> combos = ui->tabWidget->findChildren<QComboBox*>();
+    foreach (QComboBox *widget, combos)
+        connect(widget, SIGNAL(currentIndexChanged(int)), this, SLOT(updateApplyState()));
+    const QList<QSpinBox*> spins = ui->tabWidget->findChildren<QSpinBox*>();
+    foreach (QSpinBox *widget, spins)
+        connect(widget, SIGNAL(valueChanged(int)), this, SLOT(updateApplyState()));
+    const QList<QLineEdit*> edits = ui->tabWidget->findChildren<QLineEdit*>();
+    foreach (QLineEdit *widget, edits)
+        connect(widget, SIGNAL(textChanged(QString)), this, SLOT(updateApplyState()));
+}
+
+void UIConfig::applySettings() {
+    saveConfiguration();
 }
 
 void UIConfig::accept(void) {
+    if (saveConfiguration())
+        hide();
+}
+
+bool UIConfig::saveConfiguration() {
     settings->beginGroup("updater");
         settings->setValue("check_on_startup", updateStartupCheckBox->isChecked());
         settings->setValue("check_periodic", updatePeriodicCheckBox->isChecked());
@@ -312,13 +401,23 @@ void UIConfig::accept(void) {
     settings->setValue("updater/application_port", ui->sbApplicationPort->value());
 
     settings->sync();
+    if (settings->status() != QSettings::NoError) {
+        QMessageBox::warning(this, tr("Settings could not be saved"),
+                             tr("Changes could not be written to settings.ini. "
+                                "Please check folder permissions and try again."));
+        return false;
+    }
 
+    captureAppliedValues();
     emit configurationChanged();
-    hide();
+    return true;
 }
 
 void UIConfig::reject(void) {
     hide();
+    // Cancel discards edits made since the last successful Apply/OK.
+    loadSettings();
+    loadShortcuts();
 }
 
 void UIConfig::chooseLocation(void) {

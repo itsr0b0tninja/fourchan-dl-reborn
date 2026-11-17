@@ -96,12 +96,10 @@ jobs:
         run: |
           set -euo pipefail
           qtplugins="/ucrt64/share/qt5/plugins"
-          mkdir -p portable/platforms portable/imageformats portable/styles
+          mkdir -p portable/platforms portable/imageformats
           cp -v "$qtplugins/platforms/qwindows.dll" portable/platforms/
           for f in "$qtplugins"/imageformats/*.dll; do cp -v "$f" portable/imageformats/; done
-          if test -s "$qtplugins/styles/qwindowsvistastyle.dll"; then
-            cp -v "$qtplugins/styles/qwindowsvistastyle.dll" portable/styles/
-          fi
+          # Qt Fusion is built into Qt Widgets. No external styles DLL.
 
           # Copy the transitive PE dependencies supplied by MSYS2, but not
           # Windows system DLLs. Plugins depend on DLLs in the app root.
@@ -119,7 +117,7 @@ jobs:
 
           copy_deps portable/4chan-dl-reborn.exe portable
           copy_deps portable/plugins/parser4chan.dll portable
-          for plugin in portable/platforms/*.dll portable/imageformats/*.dll portable/styles/*.dll; do
+          for plugin in portable/platforms/*.dll portable/imageformats/*.dll; do
             copy_deps "$plugin" portable
           done
           copy_deps portable/updater/upd4t3r.exe portable/updater
@@ -149,6 +147,7 @@ jobs:
             'The update service uses the GitHub repository itsr0b0tninja/fourchan-dl-reborn.' \
             'The v0.1 build contains the 4chan parser; other legacy imageboards are not bundled.' \
             > portable/PORTABLE-NOTES.txt
+          test ! -d portable/styles
           test -s portable/platforms/qwindows.dll
           test -s portable/Qt5Core.dll
           test -s portable/Qt5Network.dll

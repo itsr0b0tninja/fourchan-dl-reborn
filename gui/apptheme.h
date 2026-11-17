@@ -6,8 +6,7 @@
 
 namespace AppTheme {
 
-// Global Qt appearance; the original light application style/palette is
-// captured before any dark styling and restored exactly when switching back.
+// Two explicit colour palettes on the same built-in Qt Fusion control style.
 void applyTheme(const QString &name);
 bool isDark();
 QColor overviewTextColor();

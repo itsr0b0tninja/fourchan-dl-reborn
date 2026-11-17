@@ -47,18 +47,11 @@ int main(int argc, char *argv[])
     QSettings settings("settings.ini", QSettings::IniFormat);
     int logLevel;
 
-#if QT_VERSION >= 0x050000
-#ifdef Q_OS_WIN
-    a.setStyle("windowsvista");
-#else
+    // v0.4.2: both Light and Dark use the built-in Fusion style.
+    // No styles/qwindowsvistastyle.dll is required.
     a.setStyle("fusion");
-#endif
-#else
-    a.setStyle("plastique");
-#endif
 
-    // Capture the existing native Light look before any widgets are created;
-    // saved Dark mode uses the application-wide charcoal Fusion palette.
+    // Apply the stored Light/Dark palette before creating any widgets.
     AppTheme::applyTheme(settings.value("options/theme", "light").toString());
 
     // init the logging mechanism

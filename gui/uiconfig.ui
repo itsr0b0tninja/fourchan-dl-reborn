@@ -943,6 +943,23 @@
       </spacer>
      </item>
      <item>
+      <widget class="QPushButton" name="btnApply">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Save changes without closing Settings</string>
+       </property>
+       <property name="text">
+        <string>Apply</string>
+       </property>
+       <property name="icon">
+        <iconset resource="resources.qrc">
+         <normaloff>:/icons/resources/dialog-ok.png</normaloff>:/icons/resources/dialog-ok.png</iconset>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="btnAccept">
        <property name="text">
         <string>OK</string>

@@ -7,22 +7,47 @@
 
 namespace {
 
-bool initialized = false;
+bool themeApplied = false;
 bool darkActive = false;
-QPalette originalPalette;
-QString originalStyleName;
-QString originalStyleSheet;
 
-void captureLightAppearance() {
-    if (initialized)
-        return;
-    QApplication *app = qobject_cast<QApplication *>(QApplication::instance());
-    if (!app)
-        return;
-    originalPalette = app->palette();
-    originalStyleName = app->style()->objectName();
-    originalStyleSheet = app->styleSheet();
-    initialized = true;
+// Both themes now use the same built-in Qt Fusion controls. No Windows Vista
+// style plugin is needed, and both palettes are fully explicit.
+QPalette lightPalette() {
+    const QColor window("#f0f2f5");
+    const QColor control("#e6eaf0");
+    const QColor foreground("#202934");
+    const QColor subdued("#707985");
+    const QColor selection("#3175b8");
+
+    QPalette palette;
+    palette.setColor(QPalette::Window, window);
+    palette.setColor(QPalette::WindowText, foreground);
+    palette.setColor(QPalette::Base, QColor("#ffffff"));
+    palette.setColor(QPalette::AlternateBase, QColor("#f5f7fa"));
+    palette.setColor(QPalette::Text, foreground);
+    palette.setColor(QPalette::Button, control);
+    palette.setColor(QPalette::ButtonText, foreground);
+    palette.setColor(QPalette::BrightText, QColor("#ffffff"));
+    palette.setColor(QPalette::ToolTipBase, QColor("#ffffff"));
+    palette.setColor(QPalette::ToolTipText, foreground);
+    palette.setColor(QPalette::Highlight, selection);
+    palette.setColor(QPalette::HighlightedText, QColor("#ffffff"));
+    palette.setColor(QPalette::Light, QColor("#ffffff"));
+    palette.setColor(QPalette::Midlight, QColor("#f5f7fa"));
+    palette.setColor(QPalette::Mid, QColor("#c4cad4"));
+    palette.setColor(QPalette::Dark, QColor("#929aa7"));
+    palette.setColor(QPalette::Shadow, QColor("#4a535d"));
+    palette.setColor(QPalette::Link, QColor("#1965ae"));
+    palette.setColor(QPalette::LinkVisited, QColor("#7547ad"));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 12, 0)
+    palette.setColor(QPalette::PlaceholderText, subdued);
+#endif
+    palette.setColor(QPalette::Disabled, QPalette::WindowText, subdued);
+    palette.setColor(QPalette::Disabled, QPalette::Text, subdued);
+    palette.setColor(QPalette::Disabled, QPalette::ButtonText, subdued);
+    palette.setColor(QPalette::Disabled, QPalette::Highlight, QColor("#bac4d0"));
+    palette.setColor(QPalette::Disabled, QPalette::HighlightedText, foreground);
+    return palette;
 }
 
 QPalette charcoalPalette() {
@@ -62,6 +87,44 @@ QPalette charcoalPalette() {
     palette.setColor(QPalette::Disabled, QPalette::Highlight, QColor("#414958"));
     palette.setColor(QPalette::Disabled, QPalette::HighlightedText, subdued);
     return palette;
+}
+
+QString lightStyleSheet() {
+    // Match the Dark theme's widget geometry and selected-state design.
+    // Only the colours differ; the underlying Qt control style is Fusion.
+    return QStringLiteral(
+        "QToolTip { color:#202934; background-color:#ffffff;"
+        " border:1px solid #b6bdc8; padding:4px; }"
+        "QMenu { background-color:#ffffff; color:#202934;"
+        " border:1px solid #c4cad4; }"
+        "QMenu::item:selected { background-color:#3175b8; color:#ffffff; }"
+        "QTabWidget::pane { border:1px solid #c4cad4; }"
+        "QTabBar::tab { background:#e6eaf0; color:#202934;"
+        " border:1px solid #c4cad4; padding:5px 8px; }"
+        "QTabBar::tab:selected { background:#ffffff;"
+        " border-color:#3175b8; color:#202934; }"
+        "QTabBar::tab:hover:!selected { background:#d5deea; }"
+        "QTabBar::tab:disabled { color:#707985; }"
+        "QDockWidget::title { background:#e6eaf0; color:#202934; padding:5px; }"
+        "QHeaderView::section { background:#e6eaf0; color:#202934;"
+        " border:1px solid #c4cad4; padding:4px; }"
+        "QTreeView::item:selected, QListView::item:selected,"
+        " QTableView::item:selected { background:#3175b8; color:#ffffff; }"
+        "QTreeView::item:hover:!selected, QListView::item:hover:!selected {"
+        " background:#e5edf7; }"
+        "QProgressBar { color:#202934; background:#f5f7fa;"
+        " border:1px solid #c4cad4; border-radius:3px; text-align:center; }"
+        "QProgressBar::chunk { background:#3175b8; border-radius:2px; }"
+        "QScrollBar:vertical { background:#edf0f4; width:12px; margin:0; }"
+        "QScrollBar:horizontal { background:#edf0f4; height:12px; margin:0; }"
+        "QScrollBar::handle:vertical { background:#a4adba; min-height:20px;"
+        " margin:2px; border-radius:3px; }"
+        "QScrollBar::handle:horizontal { background:#a4adba; min-width:20px;"
+        " margin:2px; border-radius:3px; }"
+        "QScrollBar::add-line, QScrollBar::sub-line { width:0; height:0;"
+        " border:0; background:transparent; }"
+        "QScrollBar::add-page, QScrollBar::sub-page { background:transparent; }"
+    );
 }
 
 QString charcoalStyleSheet() {
@@ -111,41 +174,28 @@ void applyTheme(const QString &name) {
     QApplication *app = qobject_cast<QApplication *>(QApplication::instance());
     if (!app)
         return;
-    captureLightAppearance();
 
     const bool wantDark = name.trimmed().compare(QStringLiteral("dark"),
                                                  Qt::CaseInsensitive) == 0;
-    if (wantDark == darkActive)
+    if (themeApplied && wantDark == darkActive)
         return;
 
-    if (wantDark) {
-        // Native Windows controls ignore parts of the dark palette; Fusion
-        // honours it consistently throughout the application's widgets.
-        app->setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
-        app->setPalette(charcoalPalette());
-        app->setStyleSheet(charcoalStyleSheet());
-    } else {
-        // Remove the dark stylesheet *before* restoring the native style.
-        // Qt's stylesheet engine can modify palette roles while being removed,
-        // so restoring the original palette must be the final operation.
-        app->setStyleSheet(originalStyleSheet);
-        QStyle *lightStyle = QStyleFactory::create(originalStyleName);
-        if (lightStyle)
-            app->setStyle(lightStyle);
-        // Qt may merge unresolved Link/LinkVisited brushes from the previous
-        // application palette, even after setPalette(originalPalette). Force
-        // the original native hyperlink colours for all widget states.
-        QPalette lightPalette = originalPalette;
-        for (int group = QPalette::Active; group <= QPalette::Inactive; ++group) {
-            const QPalette::ColorGroup g = static_cast<QPalette::ColorGroup>(group);
-            lightPalette.setBrush(g, QPalette::Link, originalPalette.brush(g, QPalette::Link));
-            lightPalette.setBrush(g, QPalette::LinkVisited,
-                                  originalPalette.brush(g, QPalette::LinkVisited));
-        }
-        app->setPalette(lightPalette);
+    // Qt Fusion is built into Qt Widgets, so the Windows Vista DLL is no
+    // longer needed. Use precisely the same control shapes in both modes.
+    if (app->style()->objectName().compare(QStringLiteral("fusion"),
+                                           Qt::CaseInsensitive) != 0) {
+        QStyle *fusion = QStyleFactory::create(QStringLiteral("Fusion"));
+        if (fusion)
+            app->setStyle(fusion);
     }
 
+    // Clear the old theme stylesheet before changing palettes. Qt's
+    // stylesheet style can otherwise retain previous link colours.
+    app->setStyleSheet(QString());
+    app->setPalette(wantDark ? charcoalPalette() : lightPalette());
+    app->setStyleSheet(wantDark ? charcoalStyleSheet() : lightStyleSheet());
     darkActive = wantDark;
+    themeApplied = true;
 }
 
 bool isDark() {

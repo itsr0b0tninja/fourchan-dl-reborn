@@ -1,5 +1,17 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.4.2 — Consistent Fusion themes and Settings Apply
+- Use Qt Fusion controls for both Light and Dark, retaining Dark's charcoal palette and selection colours while giving Light a soft grey/white palette and matching control styling.
+- Preserve Light as the default theme, and remember the selected theme between launches.
+- Stop bundling qwindowsvistastyle.dll and the optional styles directory. Existing installations can delete an old styles directory manually; do not delete user files during updates.
+- Add an Apply button immediately to the left of OK, retaining the existing OK/Cancel buttons and Settings window layout.
+- Apply saves settings and refreshes the running application without closing Settings; OK saves and closes; Cancel discards unapplied edits.
+- Enable Apply only when an editable option differs from its last successfully applied value, and disable it again after saving or reverting.
+- Remember the last open Settings tab across restarts without marking other settings dirty.
+- Keep the separate timeout-value and folder-shortcut editors' existing independent save behaviour.
+- Preserve existing settings.ini keys, thread downloads, the thread mover, automatic updates, and the internal viewer.
+- Extend Windows Qt theme smoke tests for both Fusion palettes, live switching and layout/colour restoration.
+
 ## v0.4.1 — Optional charcoal dark mode
 - Add a two-option Theme preference under Settings → General: Light (default) and Dark.
 - Preserve the original Windows Light look and default for existing installations; do not follow the Windows system theme automatically.

@@ -6,6 +6,9 @@
 #include <QCheckBox>
 #include <QSpinBox>
 #include <QComboBox>
+#include <QMap>
+#include <QVariant>
+#include <QWidget>
 #include <QLineEdit>
 #include <QFileDialog>
 #include "uilisteditor.h"
@@ -40,6 +43,13 @@ private:
     UIListEditor* timeoutValueEditor;
     DialogFolderShortcut* dialogFolderShortcut;
     bool _removing_thumbnails;
+    bool loadingSettings;
+    QMap<QWidget*, QVariant> appliedValues;
+    QMap<QWidget*, QVariant> readCurrentValues() const;
+    void captureAppliedValues();
+    void connectApplyTracking();
+    void rebuildRescanIntervals(int selectedSeconds);
+    bool saveConfiguration();
     QMap<QString,QString> userAgentStrings;
 
 public slots:
@@ -48,6 +58,10 @@ public slots:
 private slots:
     void accept(void);
     void reject(void);
+    void applySettings(void);
+    void updateApplyState(void);
+    void rememberSettingsTab(int index);
+    void timeoutValuesChanged(void);
     void chooseLocation(void);
     void chooseMoveThreadLocation(void);
     void chooseThumbnailCacheLocation(void);
