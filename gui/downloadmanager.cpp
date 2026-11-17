@@ -99,6 +99,11 @@ void DownloadManager::replyFinished(QNetworkReply* reply) {
             if (sizeHeader.isValid() && sizeHeader.toLongLong() >= 0
                     && body.size() != sizeHeader.toLongLong()) {
                 retryOrFail(uid, "Incomplete HTTP body", false);
+            } else if (dr->expectedSize() > 0 && body.size() != dr->expectedSize()) {
+                QLOG_WARN() << "DownloadManager :: 4chan attachment size mismatch"
+                            << reply->url() << "expected" << dr->expectedSize()
+                            << "actual" << body.size();
+                retryOrFail(uid, "Attachment size mismatch", false);
             } else if (body.isEmpty() && reply->url().path().contains("/thread/")) {
                 retryOrFail(uid, "Empty thread response", false);
             } else {
@@ -184,7 +189,7 @@ void DownloadManager::freeRequest(qint64 uid) {
 //    QLOG_TRACE() << "DownloadManager :: " << "priorities" << priorities;
 }
 
-qint64 DownloadManager::requestDownload(RequestHandler* caller, QUrl url, int prio) {
+qint64 DownloadManager::requestDownload(RequestHandler* caller, QUrl url, int prio, qint64 expectedSize) {
     DownloadRequest* dr;
     qint64 uid;
 
@@ -192,6 +197,7 @@ qint64 DownloadManager::requestDownload(RequestHandler* caller, QUrl url, int pr
     dr->setRequestHandler(caller);
     dr->setUrl(url);
     dr->setPriority(prio);
+    dr->setExpectedSize(expectedSize);
 
     connect(dr, SIGNAL(requestUnpaused()), this, SLOT(retryReady()));
 
