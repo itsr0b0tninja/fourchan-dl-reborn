@@ -1,4 +1,5 @@
 ﻿#include "uiconfig.h"
+#include "fourchanrequestheaders.h"
 #include "ui_uiconfig.h"
 
 UIConfig::UIConfig(QWidget *parent) :
@@ -154,7 +155,11 @@ void UIConfig::loadSettings(void) {
                                                        .arg("thread-cache")).toString());
         ui->cbCompressCacheFile->setChecked(settings->value("compress_cache_file", true).toBool());
 
-        ui->leUserAgent->setText(settings->value("user-agent", "Wget/1.12").toString());
+        QString agent = settings->value("user-agent",
+            QString::fromLatin1(FourchanRequestHeaders::defaultUserAgent())).toString();
+        if (agent.trimmed().isEmpty() || agent == "Wget/1.12")
+            agent = QString::fromLatin1(FourchanRequestHeaders::defaultUserAgent());
+        ui->leUserAgent->setText(agent);
         ui->cmbUserAgent->addItems(userAgentStrings.keys());
     settings->endGroup();
 
