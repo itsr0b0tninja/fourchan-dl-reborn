@@ -2,9 +2,9 @@
 
 A maintained, portable Windows build of the original **fourchan-dl** downloader, updated for 4chan's JSON API.
 
-**Latest tested release:** [v0.1.1](https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest) — portable Windows x64 ZIP.
+**Latest published release:** [Download the Windows x64 portable version](https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest).
 
-**Current source:** `master` contains ongoing **v0.2.0 download-reliability development**. Unreleased code is not automatically installed. Check [GitHub Releases](https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases) for tested downloadable versions.
+**Current source:** `master` always shows the newest source. Releases are automatically published after successful Windows compilation, SSL verification, and the streaming file test when the version number increases.
 
 ## Download and updating
 
@@ -12,7 +12,7 @@ A maintained, portable Windows build of the original **fourchan-dl** downloader,
 2. Extract into its own folder and run `4chan-dl-reborn.exe`.
 3. For later **published** versions use **Check for Updates** inside the program, then install the offered update.
 
-The working v0.1.1 version has been verified by the project owner to download threads, use HTTPS, close cleanly, and update from v0.1 using its built-in updater.
+The owner confirmed successful in-program updating and verified the v0.2.0 attachment-failure UI on Windows. v0.2.1 adds streaming file writes, faster rescan lookups, and more efficient blacklist checks without redesigning the interface.
 
 ## Features
 
@@ -29,7 +29,7 @@ The working v0.1.1 version has been verified by the project owner to download th
 This repository intentionally uses **one source branch: `master`**.
 
 - Work in progress is committed directly to `master` and built through GitHub Actions.
-- Only verified versions are made available through GitHub **Releases**.
+- New versions are automatically published through GitHub **Releases** once CI succeeds; local application testing follows publication.
 - Version tags (`v0.1`, `v0.1.1`, etc.) retain precise source snapshots for recovery or rollback.
 - The application checks published releases, not every commit to `master`.
 
