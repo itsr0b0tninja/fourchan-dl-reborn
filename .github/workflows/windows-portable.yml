@@ -107,7 +107,7 @@ jobs:
           curl -fLsS --retry 3 --retry-delay 2 \
             "https://repo.msys2.org/mingw/ucrt64/$openssl3_pkg" \
             -o "$openssl3_pkg"
-          printf '%s  %s\\n' \
+          printf '%s  %s\n' \
             '773e021ebad83f14b5c103db467411e8ff064663e1c7e7f730e2be72f4117064' \
             "$openssl3_pkg" | sha256sum -c -
           for dll in libssl-3-x64.dll libcrypto-3-x64.dll; do
@@ -140,12 +140,12 @@ jobs:
         run: |
           # Prevent GitHub's build tools from masking missing bundled DLLs.
           $root = (Resolve-Path 'portable').Path
-          $env:PATH = "$root;$env:SystemRoot\\System32;$env:SystemRoot"
-          & "$root\\tls-smoke.exe"
+          $env:PATH = "$root;$env:SystemRoot\System32;$env:SystemRoot"
+          & "$root\tls-smoke.exe"
           if ($LASTEXITCODE -ne 0) {
             throw "Portable Qt TLS smoke test failed (exit code $LASTEXITCODE)."
           }
-          Remove-Item "$root\\tls-smoke.exe"
+          Remove-Item "$root\tls-smoke.exe"
 
       - name: Create downloadable portable ZIP
         shell: pwsh
