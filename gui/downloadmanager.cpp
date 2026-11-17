@@ -57,6 +57,16 @@ void DownloadManager::loadSettings() {
     setupNetworkAccessManagers((maxRequests + MAX_CONCURRENT_DOWNLOADS_PER_NAM - 1) / MAX_CONCURRENT_DOWNLOADS_PER_NAM);
 }
 
+void DownloadManager::streamReplyData() {
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply)
+        return;
+    const qint64 uid = activeReplies.key(reply, -1);
+    DownloadRequest* request = requestList.value(uid, 0);
+    if (request && request->hasFileDestination())
+        request->appendStreaming(reply->readAll());
+}
+
 void DownloadManager::replyFinished(QNetworkReply* reply) {
     const qint64 uid = activeReplies.key(reply, -1);
     if (uid == -1) {
@@ -84,15 +94,39 @@ void DownloadManager::replyFinished(QNetworkReply* reply) {
     }
 
     const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    // Drain the last network bytes before checking the byte count.
+    if (dr->hasFileDestination())
+        dr->appendStreaming(reply->readAll());
     if (reply->error() != QNetworkReply::NoError || httpCode >= 400) {
         handleError(uid, reply);
     }
     else {
         const QUrl redirect = reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
         if (!redirect.isEmpty()) {
+            dr->abortStreaming();
             dr->setUrl(reply->url().resolved(redirect));
             dr->setProcessing(false);
             priorities.insertMulti(dr->priority(), uid);
+        } else if (dr->hasFileDestination()) {
+            const qint64 streamed = dr->streamedBytes();
+            const QVariant header = reply->header(QNetworkRequest::ContentLengthHeader);
+            if (dr->streamFailed()) {
+                retryOrFail(uid, "Could not write attachment to disk", false);
+            } else if (header.isValid() && header.toLongLong() >= 0
+                       && streamed != header.toLongLong()) {
+                retryOrFail(uid, "Incomplete attachment body", false);
+            } else if (dr->expectedSize() > 0 && streamed != dr->expectedSize()) {
+                retryOrFail(uid, "Attachment size mismatch", false);
+            } else if (streamed == 0) {
+                retryOrFail(uid, "Empty attachment response", false);
+            } else if (!dr->commitStreaming()) {
+                retryOrFail(uid, "Could not commit completed attachment", false);
+            } else {
+                statistic_downloadedFiles++;
+                statistic_downloadedKBytes += float(streamed) / 1024.0f;
+                dr->requestHandler()->requestFileFinished(uid);
+                emit finishedRequestsChanged(++finishedRequests);
+            }
         } else {
             const QByteArray body = reply->readAll();
             const QVariant sizeHeader = reply->header(QNetworkRequest::ContentLengthHeader);
@@ -148,6 +182,11 @@ void DownloadManager::replyFinished(QNetworkReply* reply) {
     processRequests();
 }
 
+QString DownloadManager::getSavePath(qint64 uid) const {
+    DownloadRequest* request = requestList.value(uid, 0);
+    return request ? request->savePath() : QString();
+}
+
 QByteArray DownloadManager::getByteArray(qint64 uid) {
     QByteArray ret;
     DownloadRequest* dr;
@@ -189,7 +228,7 @@ void DownloadManager::freeRequest(qint64 uid) {
 //    QLOG_TRACE() << "DownloadManager :: " << "priorities" << priorities;
 }
 
-qint64 DownloadManager::requestDownload(RequestHandler* caller, QUrl url, int prio, qint64 expectedSize) {
+qint64 DownloadManager::requestDownload(RequestHandler* caller, QUrl url, int prio, qint64 expectedSize, QString savePath) {
     DownloadRequest* dr;
     qint64 uid;
 
@@ -198,6 +237,7 @@ qint64 DownloadManager::requestDownload(RequestHandler* caller, QUrl url, int pr
     dr->setUrl(url);
     dr->setPriority(prio);
     dr->setExpectedSize(expectedSize);
+    dr->setSavePath(savePath);
 
     connect(dr, SIGNAL(requestUnpaused()), this, SLOT(retryReady()));
 
@@ -291,6 +331,13 @@ void DownloadManager::startRequest(qint64 uid) {
     dr = requestList.value(uid, 0);
 
     if (dr != 0 && !downloadsPaused) {
+        if (dr->hasFileDestination() && !dr->beginStreaming()) {
+            QLOG_ERROR() << "DownloadManager :: Cannot create temporary attachment file"
+                         << dr->savePath();
+            priorities.remove(priorities.key(uid), uid);
+            dr->requestHandler()->error(uid, 503);
+            return;
+        }
         dr->setProcessing(true);
         sup = new SupervisedNetworkReply();
         sup->setTimeouts(initialTimeout, runningTimeout);
@@ -303,6 +350,10 @@ void DownloadManager::startRequest(qint64 uid) {
         currentRequests++;
         nam = getFreeNAM();
         rep = nam->get(req);
+        if (dr->hasFileDestination()) {
+            rep->setReadBufferSize(256 * 1024);
+            connect(rep, SIGNAL(readyRead()), this, SLOT(streamReplyData()));
+        }
 //        rep = _manager->get(req);
 
         sup->setNetworkReply(rep, uid);
@@ -321,6 +372,7 @@ void DownloadManager::handleError(qint64 uid, QNetworkReply* reply) {
     if (!dr)
         return;
 
+    dr->abortStreaming();
     const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     QLOG_WARN() << "DownloadManager :: Request failed" << reply->url()
                 << "HTTP" << httpCode << "network error" << reply->error()
@@ -345,6 +397,7 @@ void DownloadManager::retryOrFail(qint64 uid, const QString &reason, bool rateLi
     DownloadRequest* dr = requestList.value(uid, 0);
     if (!dr)
         return;
+    dr->abortStreaming();
 
     if (dr->error_count() >= maxRetries) {
         QLOG_WARN() << "DownloadManager :: Giving up after"
