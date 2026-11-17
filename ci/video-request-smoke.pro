@@ -1,0 +1,10 @@
+QT += core network
+QT -= gui
+TEMPLATE = app
+CONFIG += console c++11
+CONFIG -= app_bundle
+TARGET = video-request-smoke
+DESTDIR = ../portable
+INCLUDEPATH += ../gui
+SOURCES += video-request-smoke.cpp
+HEADERS += ../gui/fourchanrequestheaders.h
