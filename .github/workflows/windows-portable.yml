@@ -170,38 +170,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $matches = Select-String -Path 'gui/gui.pro' -Pattern '^VERSION\s*=\s*(\d+\.\d+(?:\.\d+)?)\s*
-        shell: msys2 {0}
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
-          cat > release-assets/webupdate.xml << EOF
-          <updates>
-          <win32-qt5>
-          <file name="4chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="$version" source="$url/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
-          <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="$version" source="$url/parser4chan.dll" target="plugins/parser4chan.dll" />
-          </win32-qt5>
-          </updates>
-          EOF
-          cp dist/4chan-dl-reborn-win64-portable.zip release-assets/
-          cp portable/4chan-dl-reborn.exe release-assets/
-          cp portable/plugins/parser4chan.dll release-assets/
-          cp portable/updater/upd4t3r.exe release-assets/
-          cat release-assets/webupdate.xml
-
-      - name: Publish tagged GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release-assets/*
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # The release action needs write access, but ordinary builds do not.
-    permissions:
-      contents: write
-
+          $matches = Select-String -Path 'gui/gui.pro' -Pattern '^VERSION\s*=\s*(\d+\.\d+(?:\.\d+)?)\s*$'
           if ($matches.Count -ne 1) { throw 'Expected exactly one VERSION in gui/gui.pro.' }
           $version = $matches[0].Matches[0].Groups[1].Value
           $tag = "v$version"
