@@ -1,0 +1,136 @@
+name: Windows portable and GitHub release
+
+on:
+  push:
+    branches:
+      - development/v0.1-foundation
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-win64:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MSYS2 and Qt 5
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-make
+            mingw-w64-ucrt-x86_64-qt5-base
+            mingw-w64-ucrt-x86_64-qt5-tools
+            mingw-w64-ucrt-x86_64-qt5-svg
+            mingw-w64-ucrt-x86_64-qt5-imageformats
+
+      - name: Compile application, 4chan parser and updater
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          mkdir -p portable/plugins portable/updater dist release-assets
+          pushd gui
+          qmake-qt5 gui.pro
+          mingw32-make -j2
+          popd
+          pushd plugins/parser4chan
+          qmake-qt5 parser4chan.pro
+          mingw32-make -j2
+          popd
+          pushd updater
+          qmake-qt5 updater.pro
+          mingw32-make -j2
+          popd
+          echo "Built executable files:"
+          find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'
+          cp -v 4chan-dl-reborn.exe portable/4chan-dl-reborn.exe
+          cp -v plugins/parser4chan.dll portable/plugins/parser4chan.dll
+          cp -v updater/upd4t3r.exe portable/updater/upd4t3r.exe
+          test -s portable/4chan-dl-reborn.exe
+          test -s portable/plugins/parser4chan.dll
+          test -s portable/updater/upd4t3r.exe
+
+      - name: Bundle the Windows Qt runtime
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          windeployqt --release --no-translations portable/4chan-dl-reborn.exe
+          for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll; do
+            cp -v "/ucrt64/bin/$dll" portable/
+            cp -v "/ucrt64/bin/$dll" portable/updater/
+          done
+          for dll in Qt5Core.dll Qt5Network.dll; do
+            cp -v "/ucrt64/bin/$dll" portable/updater/
+          done
+          for dll in libssl-3-x64.dll libcrypto-3-x64.dll; do
+            if test -s "/ucrt64/bin/$dll"; then
+              cp -v "/ucrt64/bin/$dll" portable/
+              cp -v "/ucrt64/bin/$dll" portable/updater/
+            fi
+          done
+          cp LICENSE portable/LICENSE.txt
+          printf '%s\n' \
+            '4chan Downloader Reborn v0.1 - portable Windows 64-bit' \
+            'Extract this ZIP into a NEW folder; do not overwrite your original installation.' \
+            'Launch 4chan-dl-reborn.exe. Use Check for Updates for future published versions.' \
+            'The update service uses the GitHub repository itsr0b0tninja/fourchan-dl-reborn.' \
+            'The v0.1 build contains the 4chan parser; other legacy imageboards are not bundled.' \
+            > portable/PORTABLE-NOTES.txt
+          test -s portable/platforms/qwindows.dll
+          find portable -maxdepth 2 -type f | sort
+
+      - name: Create downloadable portable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'portable/*' -DestinationPath 'dist/4chan-dl-reborn-win64-portable.zip' -Force
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4chan-dl-reborn-win64-portable
+          path: portable/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create release updater manifest and assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          cat > release-assets/webupdate.xml << EOF
+          <updates>
+          <win32-qt5>
+          <file name="4chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="$version" source="$url/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
+          <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="$version" source="$url/parser4chan.dll" target="plugins/parser4chan.dll" />
+          </win32-qt5>
+          </updates>
+          EOF
+          cp dist/4chan-dl-reborn-win64-portable.zip release-assets/
+          cp portable/4chan-dl-reborn.exe release-assets/
+          cp portable/plugins/parser4chan.dll release-assets/
+          cp portable/updater/upd4t3r.exe release-assets/
+          cat release-assets/webupdate.xml
+
+      - name: Publish tagged GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The release action needs write access, but ordinary builds do not.
+    permissions:
+      contents: write
