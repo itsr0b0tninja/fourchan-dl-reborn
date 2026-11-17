@@ -872,9 +872,13 @@ void MainWindow::createComponentList() {
 #ifdef Q_OS_WIN32
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
     qtFiles << "Qt5Core" << "Qt5Gui" << "Qt5Widgets" << "Qt5Network" << "Qt5Xml";
-    neededLibraries << "libeay32.dll" << "ssleay32.dll" << "libstdc++-6.dll" << "imageformats/qgif.dll"
-                    << "imageformats/qico.dll" << "imageformats/qjpeg.dll" << "imageformats/qsvg.dll"
-                    << "libgcc_s_sjlj-1.dll" << "libwinpthread-1.dll" << "platforms/qwindows.dll";
+    // Qt 5 UCRT64 release libraries (not obsolete Qt4/OpenSSL 1.x DLL names).
+    neededLibraries << "libssl-3-x64.dll" << "libcrypto-3-x64.dll"
+                    << "libstdc++-6.dll" << "libgcc_s_seh-1.dll"
+                    << "libwinpthread-1.dll"
+                    << "imageformats/qgif.dll" << "imageformats/qico.dll"
+                    << "imageformats/qjpeg.dll" << "imageformats/qsvg.dll"
+                    << "platforms/qwindows.dll";
 
 #else
     qtFiles << "QtCore4" << "QtGui4" << "QtNetwork4" << "QtXml4";
