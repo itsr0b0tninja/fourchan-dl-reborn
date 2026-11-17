@@ -125,11 +125,14 @@ void applyTheme(const QString &name) {
         app->setPalette(charcoalPalette());
         app->setStyleSheet(charcoalStyleSheet());
     } else {
+        // Remove the dark stylesheet *before* restoring the native style.
+        // Qt's stylesheet engine can modify palette roles while being removed,
+        // so restoring the original palette must be the final operation.
+        app->setStyleSheet(originalStyleSheet);
         QStyle *lightStyle = QStyleFactory::create(originalStyleName);
         if (lightStyle)
             app->setStyle(lightStyle);
         app->setPalette(originalPalette);
-        app->setStyleSheet(originalStyleSheet);
     }
 
     darkActive = wantDark;

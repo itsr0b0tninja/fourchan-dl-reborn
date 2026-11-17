@@ -52,7 +52,16 @@ int main(int argc, char **argv) {
     if (AppTheme::isDark()) return 10;
     if (app.palette() != original ||
             app.styleSheet() != originalCss ||
-            app.style()->objectName() != originalStyle) return 11;
+            app.style()->objectName() != originalStyle) {
+        qWarning() << "Light restoration mismatch:"
+                   << "palette equal=" << (app.palette() == original)
+                   << "CSS equal=" << (app.styleSheet() == originalCss)
+                   << "old style=" << originalStyle
+                   << "restored style=" << app.style()->objectName()
+                   << "original window=" << original.color(QPalette::Window)
+                   << "restored window=" << app.palette().color(QPalette::Window);
+        return 11;
+    }
     if (AppTheme::overviewTextColor() != QColor(Qt::black) ||
             AppTheme::overviewNewImagesColor() != QColor(Qt::darkGreen) ||
             AppTheme::warningTextColor() != "#aa0000") return 12;
