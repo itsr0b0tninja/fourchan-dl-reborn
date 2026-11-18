@@ -260,14 +260,12 @@ jobs:
           }
           Remove-Item "$root\image-codecs-smoke.exe"
 
-      - name: Create portable ZIP for milestone versions only
+      - name: Create complete Windows portable ZIP
         shell: pwsh
         run: |
-          $version = (Select-String -Path 'gui/gui.pro' -Pattern '^VERSION\s*=\s*(\d+\.\d+\.\d+)').Matches[0].Groups[1].Value
-          if ($version -match '^\d+\.\d+\.0$') {
-            Compress-Archive -Path 'portable/*' -DestinationPath 'dist/4chan-dl-reborn-win64-portable.zip' -Force
-          } else {
-            Write-Host "Incremental v${version}: no portable ZIP."
+          Compress-Archive -Path 'portable/*' -DestinationPath 'dist/4chan-dl-reborn-win64-portable.zip' -Force
+          if (-not (Test-Path 'dist/4chan-dl-reborn-win64-portable.zip')) {
+            throw 'Complete portable ZIP was not created.'
           }
 
       - name: Upload portable build
@@ -340,9 +338,10 @@ jobs:
           @"
           4Chan Downloader Reborn $tag
 
-          Incremental updater release: individually distributed components.
-          Milestone versions ending .0 include a complete portable ZIP.
-          LICENSE.txt is distributed separately.
+          Windows x64 portable package: application, 4chan parser, updater and required runtime.
+          Download the complete portable ZIP for a new installation.
+          Existing installations can use Check for Updates in the app.
+          LICENSE.txt and SHA-256 checksums are provided with this release.
 
           See CHANGELOG.md for details.
           "@ | Set-Content -Path 'release-assets/release-notes.txt' -Encoding utf8

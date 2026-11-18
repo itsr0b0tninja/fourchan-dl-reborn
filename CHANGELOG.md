@@ -1,11 +1,11 @@
 # Changelog — 4chan Downloader Reborn
 
-## v1.0.1 — Thread Overview board filter (source only; no build)
+## v1.0.1 — Thread Overview board filter
 - Click the URI column header to filter open threads by board, such as /b/, /s/ or /r9k/, with an All boards option.
 - Populate the menu from all open threads, show board counts and remember the chosen board in settings.ini between sessions.
 - Combine board and status filters without sorting, deleting, or changing the positions of threads and tabs.
 - Keep column widths user-controlled and add automated checks for board URL parsing, the header click and stable row identity.
-- Source changes only; no Windows build or GitHub release for v1.0.1 yet.
+- Package the complete Windows x64 portable ZIP and in-app updater executable, with GitHub Actions compilation and regression checks required before publication.
 
 ## v1.0.0 — First complete Windows release
 - v0.6 audit follow-up: correct parser initialization-request indexing and strict official-host matching (including boards.4channel.org); correct thumbnail-size success reporting.
