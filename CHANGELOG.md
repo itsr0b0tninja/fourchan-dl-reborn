@@ -1,12 +1,12 @@
 # Changelog — 4chan Downloader Reborn
 
-## v1.1.1 — Thumbnail sizing improvements (source only; not yet built)
+## v1.1.1 — Thumbnail sizing improvements
 - Allow changing thumbnail width and height after thumbnails have already been added; remove the old size lock.
 - Calculate grid height from the actual caption lines, keeping hidden captions from leaving large empty gaps.
 - Prevent long file paths from wrapping into excessive lines; the full path remains available in each thumbnail's tooltip and file actions.
 - Smoothly enlarge 4chan's smaller WebM and MP4 preview images to the configured thumbnail bounds while preserving aspect ratio. Normal image enlargement settings remain unchanged.
 - Store different thumbnail dimensions under separate cache keys, refresh existing thumbnail tiles when size settings change, and validate rendering options in PNG cache metadata instead of accepting a file because one dimension happens to match.
-- Extend thumbnail caption regression checks for compact grid sizing and dimension changes. No build or release has been run for v1.1.1.
+- Extend automated Windows thumbnail-caption regression checks for compact grid sizing and dimension changes.
 
 ## v1.1.0 — Video thumbnails and thumbnail captions
 - Show thumbnail previews for downloaded MP4 and WebM files using the JPEG preview provided by 4chan. Fetch previews on the background thumbnail worker and cache them separately from older video placeholders; fall back to the existing missing-image icon if a preview is unavailable.
