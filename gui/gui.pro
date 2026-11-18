@@ -61,6 +61,7 @@ HEADERS  += mainwindow.h \
     networkaccessmanager.h \
     pluginmanager.h \
     ParserPluginInterface.h \
+    parserdomainpolicy.h \
     structs.h \
     ecwin7.h \
     uiimageviewer.h \

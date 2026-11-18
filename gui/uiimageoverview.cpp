@@ -128,8 +128,6 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
     connect(ui->listWidget, SIGNAL(deleteItem()), this, SLOT(deleteFile()));
     connect(ui->listWidget, SIGNAL(reloadItem()), this, SLOT(reloadFile()));
 
-    connect(tnt, SIGNAL(thumbnailAvailable(QString,QString)), this, SLOT(addThumbnail(QString,QString)));
-    connect(tnt, SIGNAL(thumbnailsAvailable(QString)), this, SLOT(addThumbnails(QString)));
 
     connect(thumbnailCheckTimer, SIGNAL(timeout()), this, SLOT(checkForMissingThumbnails()));
 
@@ -150,18 +148,13 @@ UIImageOverview::~UIImageOverview()
 }
 
 bool UIImageOverview::setThumbnailSize(QSize s) {
-    bool ret;
-
-    ret = false;
-
-    if (!thumbnailsizeLocked) {
-        iconSize = s;
-        ui->listWidget->setIconSize(iconSize);
-        ui->listWidget->setGridSize(QSize(iconSize.width()+10,iconSize.height()+20));
-        thumbnailsizeLocked = true;
-    }
-
-    return ret;
+    if (thumbnailsizeLocked)
+        return false;
+    iconSize = s;
+    ui->listWidget->setIconSize(iconSize);
+    ui->listWidget->setGridSize(QSize(iconSize.width()+10, iconSize.height()+20));
+    thumbnailsizeLocked = true;
+    return true;
 }
 
 void UIImageOverview::start(void) {
@@ -331,19 +324,6 @@ void UIImageOverview::addThumbnail(QString filename, QString tnFilename) {
     if (this->isVisible())
         thumbnailCountLastViewed = thumbnailCount;
     updateDownloadStatus();
-}
-
-void UIImageOverview::addThumbnails(QString thumbnails) {
-    QStringList image_filenames;
-    image_filenames = thumbnails.split(";;;");
-
-    QLOG_TRACE() << Q_FUNC_INFO << ":: Map size " << image_filenames.count();
-    for (int i=0; i<image_filenames.count(); i++) {
-        if (pendingThumbnails.contains(image_filenames.at(i).split(":::").at(0))) {
-            addThumbnail(image_filenames.at(i).split(":::").at(0),
-                         image_filenames.at(i).split(":::").at(1));
-        }
-    }
 }
 
 void UIImageOverview::checkForMissingThumbnails() {

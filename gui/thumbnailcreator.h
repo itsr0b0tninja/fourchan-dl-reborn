@@ -5,7 +5,6 @@
 #include <QImage>
 #include <QList>
 #include <QStringList>
-#include <QTimer>
 #include <QSettings>
 #include <QMutex>
 #include <QWaitCondition>
@@ -32,29 +31,17 @@ public:
 private:
     QStringList list;
     QSize* iconSize;
-    bool hq;
-    volatile bool canceled;
     volatile bool halted;
     QSettings* settings;
     bool newImages;
     bool stopping;
     QString cacheFolder;
-    bool useCache;
     QMutex mutex;
     QWaitCondition condition;
 
-    QTimer* event_emit_timer;
-    bool thumbnails_created;
-    QStringList rendered_thumbnails;
-    bool use_combined_thumbnail_list;
 
-private slots:
-    void eventEmitTimerTriggered();
-    
 signals:
     void pendingThumbnails(int);
-    void thumbnailAvailable(QString, QString);
-    void thumbnailsAvailable(QString);
     
 public slots:
     void go();

@@ -77,6 +77,11 @@ jobs:
           mingw32-make -j2
           qmake-qt5 image-codecs-smoke.pro
           mingw32-make -j2
+          qmake-qt5 parser-domain-smoke.pro
+          mingw32-make -j2
+          # Validate parser domains without a network connection.
+          ../portable/parser-domain-smoke.exe
+          rm -f ../portable/parser-domain-smoke.exe
           # Run against the real Qt widget palette and style while the full
           # MSYS2 runtime (including the offscreen platform plugin) is present.
           if ! QT_QPA_PLATFORM=offscreen ../portable/theme-smoke.exe; then

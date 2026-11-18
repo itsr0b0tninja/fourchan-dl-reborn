@@ -1,6 +1,10 @@
 # Changelog — 4chan Downloader Reborn
 
 ## Unreleased — Repository-only source cleanup (no version change)
+- v0.6 audit follow-up: correct parser initialization-request indexing and strict official-host matching (including boards.4channel.org); correct thumbnail-size success reporting.
+- Remove dormant thumbnail notification branch while preserving cache polling; remove the unused empty running-request API, obsolete console version probe, unreachable updater menu line and no-op thumbnail-remover stop method.
+- Standardize the application name and window title to "4Chan Downloader Reborn" without a version suffix. Installed version remains visible in Program Information and available for updates.
+- Append a 2026 project licensing/attribution note to LICENSE without changing the GPLv3 legal text.
 - Remove the discontinued console frontend and the five historic non-4chan parser projects, which are not part of the maintained Windows release.
 - Remove an unreferenced ThumbnailCache placeholder, unused OS/2/macOS source resources, duplicate resource entries and image assets unused by the GUI or Qt resource file.
 - Update the root and parser qmake projects to match the active GUI, 4chan parser and updater; remove stale project references to absent readme/settings files.

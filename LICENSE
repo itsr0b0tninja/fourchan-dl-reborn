@@ -672,3 +672,28 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
+
+------------------------------------------------------------------------
+PROJECT LICENSING NOTICE — 4Chan Downloader Reborn (updated 2026)
+------------------------------------------------------------------------
+
+4Chan Downloader Reborn is a maintained derivative of the original
+fourchan-dl program. Credit and copyright in the original work remain
+with its original authors; later contributions remain attributed to
+their respective copyright holders. See source headers and Git history
+for individual authorship and attribution.
+
+The project continues to distribute its own source under the GNU General
+Public License, version 3 (GPLv3), subject to any additional permissions
+expressly granted by individual copyright notices. Libraries and other
+third-party components retain their respective licence obligations.
+
+The complete text of GNU GPL version 3 above has been preserved verbatim.
+Its 29 June 2007 publication date and Free Software Foundation copyright
+notice belong to the licence itself and must not be changed merely
+because the project is actively maintained in 2026.
+
+Current repository:
+https://github.com/itsr0b0tninja/fourchan-dl-reborn
+
+This project notice does not replace, supersede, or amend the GPL text.

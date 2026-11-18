@@ -37,7 +37,6 @@ public:
     QDateTime nextRetryForAttachments(const QHash<QString, int> &urlIndex) const;
     void setMaxPriority(int);
     QMap<qint64, QString> getPendingRequestsMap();
-    QMap<qint64, QString> getRunningRequestsMap();
     QString getFilenameForURL(QUrl);
     int getHighestPriority();
     bool cacheAvailable(QUrl url);

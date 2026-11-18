@@ -18,7 +18,6 @@ class ThumbnailRemover : public QObject
     Q_OBJECT
 public:
     explicit ThumbnailRemover(QObject *parent = 0);
-    void stop();
 
 private:
     QSettings* settings;

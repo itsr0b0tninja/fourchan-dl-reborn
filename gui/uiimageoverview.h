@@ -175,7 +175,6 @@ private slots:
 
 public slots:
     void addThumbnail(QString, QString);
-    void addThumbnails(QString);
     void start(void);
     void stop(void);
     void videoSettingChanged();

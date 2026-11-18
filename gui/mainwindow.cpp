@@ -146,15 +146,11 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(aui, SIGNAL(updateFinished()), this, SLOT(updateFinished()));
     connect(aui, SIGNAL(updaterVersionSent(QString)), this, SLOT(setUpdaterVersion(QString)));
 
-//    createSupervisedDownload(QUrl("http://sourceforge.net/projects/fourchan-dl/files/"));
     createComponentList();
 
-#ifdef __DEBUG__
-    createSupervisedDownload(QUrl("file:d:/Qt/fourchan-dl/webupdate.xml"));
-#else
+    // Debug and release builds both use the maintained GitHub update source.
     if (settings->value("updater/check_on_startup", true).toBool())
         beginGitHubUpdateCheck(false);
-#endif
     // Every launch begins an independent session timer; no deadline is persisted.
     reloadUpdateCheckSettings();
 
@@ -642,8 +638,6 @@ void MainWindow::askForUpdate() {
         }
         break;
 
-        ui->menuBar->removeAction(ui->actionAskForUpdate);
-
     case QMessageBox::No:
     default:
         break;
@@ -677,14 +671,6 @@ void MainWindow::getUpdaterVersion() {
     }
 
 #endif
-}
-
-void MainWindow::getConsoleVersion() {
-    QProcess process;
-
-    if (process.startDetached("fourchan-dl-console.exe --version")) {
-        ui->statusBar->showMessage("Starting fourchan-dl-console for version check", 2000);
-    }
 }
 
 void MainWindow::startAll() {
@@ -1217,14 +1203,6 @@ void MainWindow::createComponentList() {
         }
     }
 
-    if (QFile::exists(QString("%1/%2").arg(QApplication::applicationDirPath()).arg(CONSOLE_APPNAME))) {
-        c.filename = CONSOLE_APPNAME;
-        c.componentName = "Console";
-        c.type = "executable";
-        c.version = settings->value("console/version", "0.1.0").toString();
-        components.insert(QString("%1:%2").arg(c.type).arg(c.filename), c);
-    }
-
 #ifdef USE_UPDATER
     // TODO: use updaterFileName (but without the path)
     c.filename = "upd4t3r.exe";
@@ -1304,9 +1282,8 @@ void MainWindow::updateFinished() {
     aui->closeUpdaterExe();
     aui->exchangeFiles();
 
-    // We may have updated versions for the updater.exe or console.exe
+    // Refresh the maintained standalone updater version after an update.
     getUpdaterVersion();
-    getConsoleVersion();
 }
 
 QList<component_information> MainWindow::getComponents() {

@@ -36,7 +36,7 @@ void ThumbnailRemover::removeFiles(QStringList fileList) {
 }
 
 void ThumbnailRemover::removeAll() {
-    if (dir.exists())//QDir::NoDotAndDotDot
+    if (dir.exists())
     {
         fileInfoList = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
 
@@ -46,7 +46,4 @@ void ThumbnailRemover::removeAll() {
     }
 
     emit filesRemoved();
-}
-
-void ThumbnailRemover::stop() {
 }

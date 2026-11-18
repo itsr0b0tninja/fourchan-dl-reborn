@@ -644,19 +644,6 @@ QMap<qint64, QString> DownloadManager::getPendingRequestsMap() {
     return ret;
 }
 
-QMap<qint64, QString> DownloadManager::getRunningRequestsMap() {
-    QMap<qint64, QString> ret;
-    QHashIterator<qint64, QNetworkReply*>  requests(activeReplies);
-/*
-    while (requests.hasNext()) {
-        requests.next();
-
-        ret.insertMulti(0, requests.value()->url().toString());
-    }
-*/
-    return ret;
-}
-
 bool DownloadManager::cacheAvailable(QUrl url) {
     bool ret;
     QFile f;

@@ -67,7 +67,7 @@ void UIInfo::updateAboutText() {
     // so this information is readable under both Fusion Light and Dark.
     const QString html = QStringLiteral(
         "<p style='margin-top:0px; margin-bottom:10px;'>"
-        "<b>4chan Downloader Reborn</b></p>"
+        "<b>4Chan Downloader Reborn</b></p>"
         "<p style='margin-top:0px; margin-bottom:10px;'>"
         "Installed version: <b>%1</b><br/>"
         "Latest available version: %2</p>"

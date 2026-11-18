@@ -1,0 +1,10 @@
+QT += core
+QT -= gui
+TEMPLATE = app
+CONFIG += console c++11
+CONFIG -= app_bundle
+TARGET = parser-domain-smoke
+DESTDIR = ../portable
+INCLUDEPATH += ../gui
+SOURCES += parser-domain-smoke.cpp
+HEADERS += ../gui/parserdomainpolicy.h

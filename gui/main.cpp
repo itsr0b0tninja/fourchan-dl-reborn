@@ -10,7 +10,6 @@
 #include <QThread>
 #include "mainwindow.h"
 #include "downloadmanager.h"
-//#include "thumbnailthread.h"
 #include "thumbnailcreator.h"
 #include "foldershortcuts.h"
 #include "pluginmanager.h"
@@ -41,7 +40,7 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     // Portable mode: resolve settings.ini, thumbnails and updater paths beside the executable.
     QDir::setCurrent(a.applicationDirPath());
-    a.setApplicationName("4chan Downloader Reborn");
+    a.setApplicationName("4Chan Downloader Reborn");
     a.setApplicationVersion(PROGRAM_VERSION);
     QSettings settings("settings.ini", QSettings::IniFormat);
     int logLevel;
@@ -91,7 +90,6 @@ int main(int argc, char *argv[])
     QThread thumbnailThread;
     tnt = new ThumbnailCreator();
     tnt->moveToThread(&thumbnailThread);
-//    thumbnailThread.setPriority(QThread::NormalPriority);
 
     a.connect(&thumbnailThread, SIGNAL(started()), tnt, SLOT(go()));
     a.connect(&thumbnailThread, SIGNAL(finished()), tnt, SLOT(deleteLater()));

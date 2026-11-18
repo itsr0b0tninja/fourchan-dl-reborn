@@ -1,4 +1,5 @@
 ﻿#include "pluginmanager.h"
+#include "parserdomainpolicy.h"
 
 PluginManager::PluginManager(QObject *parent) :
     QObject(parent)
@@ -11,17 +12,6 @@ void PluginManager::loadPlugins(void)
 {
     QDir pluginDir(QCoreApplication::applicationDirPath());
     component_information c;
-#ifdef __DEBUG__
-#if defined(Q_OS_WIN)
-//        pluginDir.cdUp();
-#elif defined(Q_OS_MAC)
-    if (pluginDir.dirName() == "MacOS") {
-        pluginDir.cdUp();
-        pluginDir.cdUp();
-        pluginDir.cdUp();
-    }
-#endif
-#endif
     if (!pluginDir.cd("plugins")) {
         QLOG_WARN() << "PluginManager :: " << "Plugin directory not found: " << pluginDir.path();
     }
@@ -32,7 +22,6 @@ void PluginManager::loadPlugins(void)
         {
             QLOG_INFO() << "PluginManager :: " << "Checking file " << pluginDir.absoluteFilePath(fileName);
             QPluginLoader loader(pluginDir.absoluteFilePath(fileName));
-//            QLOG_ERROR() << loader.errorString();
             QString str;
             if (ParserPluginInterface* interface =
                     qobject_cast<ParserPluginInterface *>(loader.instance()))
@@ -52,7 +41,7 @@ void PluginManager::loadPlugins(void)
                     interface->initPlugin();
                     QList<QUrl> initURIs = interface->initialRequests();
                     for (int i=0; i<initURIs.count(); i++) {
-                        requestHandler->request(initURIs.at(0),1);
+                        requestHandler->request(initURIs.at(i),1);
                     }
                 }
                 else {
@@ -69,23 +58,17 @@ void PluginManager::loadPlugins(void)
 }
 
 ParserPluginInterface* PluginManager::getParser(QUrl url, bool* ok) {
-    QString domain;
-    ParserPluginInterface* ret;
-
-    domain = url.host();
-    ret = 0;
-    *ok = false;
-
-    for (int i=0; i<loadedPlugins.count(); i++) {
-        if (domain.indexOf(loadedPlugins.at(i)->getDomain()) != -1) {
-                ret = loadedPlugins.at(i);
+    if (ok)
+        *ok = false;
+    for (int i = 0; i < loadedPlugins.count(); ++i) {
+        ParserPluginInterface* parser = loadedPlugins.at(i);
+        if (ParserDomainPolicy::supportsUrl(url, parser->getDomain())) {
+            if (ok)
                 *ok = true;
-
-                break;
+            return parser;
         }
     }
-
-    return ret;
+    return 0;
 }
 
 ParserPluginInterface* PluginManager::getPlugin(int i) {
@@ -142,20 +125,10 @@ QStringList PluginManager::getSupportedDomains() {
 }
 
 bool PluginManager::isSupported(QString domain) {
-    bool ret;
-    QStringList supported;
-
-    ret = false;
-
-    supported = getSupportedDomains();
-
-    foreach (QString sd, supported) {
-        if (domain.contains(sd)) {
-            ret = true;
-
-            break;
-        }
+    const QUrl url = QUrl::fromUserInput(domain.trimmed());
+    for (int i = 0; i < loadedPlugins.count(); ++i) {
+        if (ParserDomainPolicy::supportsUrl(url, loadedPlugins.at(i)->getDomain()))
+            return true;
     }
-
-    return ret;
+    return false;
 }

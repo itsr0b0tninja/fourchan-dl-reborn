@@ -1,4 +1,4 @@
-# 4chan Downloader Reborn
+# 4Chan Downloader Reborn
 
 A maintained, portable Windows build of the original **fourchan-dl** downloader, updated for 4chan's JSON API.
 
@@ -39,6 +39,12 @@ This repository intentionally uses **one source branch: `master`**.
 - The application checks published releases, not every commit to `master`.
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+## Licensing
+
+The project remains available under GNU GPL version 3. The [LICENSE](LICENSE) file contains the full, unaltered GPLv3 text followed by an updated project-specific licensing and attribution notice. The original authors and subsequent contributors retain their respective copyrights. Bundled third-party components retain their own licences.
+
+The main window displays **4Chan Downloader Reborn** without a version suffix. The installed version is still available in Program Information and remains essential to update checking and releases.
 
 ## Credits
 

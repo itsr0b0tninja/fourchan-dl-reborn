@@ -4,23 +4,12 @@ ThumbnailCreator::ThumbnailCreator(QObject *parent) :
     QObject(parent)
 {
     iconSize = new QSize(100,100);
-    hq = true;
     newImages = false;
     stopping = false;
     settings = new QSettings("settings.ini", QSettings::IniFormat);
     cacheFolder = settings->value("options/thumbnail_cache_folder",
                                  QCoreApplication::applicationDirPath() + "/tncache").toString();
     halted = false;
-    use_combined_thumbnail_list = false;
-
-    event_emit_timer = new QTimer(this);
-
-    if (use_combined_thumbnail_list) {
-        event_emit_timer->setInterval(2000);
-        event_emit_timer->setSingleShot(true);
-
-        connect(event_emit_timer, SIGNAL(timeout()), this, SLOT(eventEmitTimerTriggered()));
-    }
 }
 
 void ThumbnailCreator::go() {
@@ -43,7 +32,6 @@ void ThumbnailCreator::go() {
                 currentFilename = list.front();
                 list.pop_front();
                 newImages = true;
-                canceled = false;
                 cacheFile = getCacheFile(currentFilename);
             }
         mutex.unlock();
@@ -56,12 +44,11 @@ void ThumbnailCreator::go() {
             iconHeight = iconSize->height();
             enlargeThumbnails = settings->value("options/enlarge_thumbnails", false).toBool();
             hqRendering = settings->value("options/hq_thumbnails", false).toBool();
-            useCache = true;
             cacheFolder = settings->value("options/thumbnail_cache_folder", QString("%1/%2").arg(QCoreApplication::applicationDirPath())
                                           .arg("tncache")).toString();
 
     //        QLOG_ALWAYS() << "ThumbnailCreator :: Using thumbnail folder " << cacheFolder;
-            if (useCache && !(dir.exists(cacheFolder))) {
+            if (!dir.exists(cacheFolder)) {
                 QLOG_TRACE() << "ThumbnailCreator :: Creating thumbnail cache folder " << cacheFolder;
                 dir.mkpath(cacheFolder);
             }
@@ -69,7 +56,7 @@ void ThumbnailCreator::go() {
             useCachedThumbnail = false;
             image_loaded = false;
             // Check if thumbnail exists
-            if (useCache && QFile::exists(cacheFile)) {
+            if (QFile::exists(cacheFile)) {
                 QLOG_TRACE() << "ThumbnailCreator :: Cached thumbnail available for " << currentFilename;
                 tn.load(cacheFile);
 
@@ -121,26 +108,12 @@ void ThumbnailCreator::go() {
                 }
             }
 
+            // The GUI continues to discover completed thumbnails by cache polling.
             mutex.lock();
-            if (use_combined_thumbnail_list) {
-                rendered_thumbnails << QString("%1:::%2").arg(currentFilename, cacheFile);
-                if (!event_emit_timer->isActive()) {
-                    event_emit_timer->start();
-                }
-            }
-            else {
-//                emit thumbnailAvailable(currentFilename, cacheFile);
-            }
             emit pendingThumbnails(list.count());
             newImages = false;
-
-            if (list.count() == 0) {
-                if (use_combined_thumbnail_list) {
-                    eventEmitTimerTriggered();
-                }
+            if (list.isEmpty())
                 condition.wait(&mutex);
-            }
-
             mutex.unlock();
         }
         else {
@@ -195,32 +168,6 @@ void ThumbnailCreator::resume() {
     halted = false;
     mutex.unlock();
 }
-/*
-void ThumbnailCreator::thumbnailAvailable(QString image_filename, QString cache_filename) {
-//    mutex.lock();
-    rendered_thumbnails.append(QString("%1:::%2").arg(image_filename, cache_filename));
-    QLOG_TRACE() << Q_FUNC_INFO << ":: adding to list: " << rendered_thumbnails;
-    thumbnails_created = true;
-
-    if (!event_emit_timer->isActive()) {
-        event_emit_timer->start();
-    }
-//    mutex.unlock();
-}
-*/
-void ThumbnailCreator::eventEmitTimerTriggered() {
-    mutex.lock();
-    QLOG_TRACE() << Q_FUNC_INFO << ":: triggered";
-    if (thumbnails_created) {
-        thumbnails_created=false;
-        QLOG_TRACE() << Q_FUNC_INFO << "emitting signal";
-        QLOG_ALWAYS() << Q_FUNC_INFO << ":: Thumbnails ready: " << rendered_thumbnails;
-//        emit thumbnailsAvailable(rendered_thumbnails.join(";;;"));
-        rendered_thumbnails.clear();
-    }
-    mutex.unlock();
-}
-
 void ThumbnailCreator::requestStop() {
     mutex.lock();
     stopping = true;
