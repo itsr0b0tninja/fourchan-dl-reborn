@@ -20,6 +20,8 @@ int main(int argc, char **argv) {
     const QStringList obsolete = LegacyRuntimeCleanup::obsoleteRelativeFiles();
     if (obsolete.size() < 24 || obsolete.contains("settings.ini") ||
             obsolete.contains("Qt5Network.dll") ||
+            obsolete.contains("libssl-4-x64.dll") ||
+            obsolete.contains("libcrypto-4-x64.dll") ||
             obsolete.contains("updater/upd4t3r.exe"))
         return 2;
 
@@ -45,6 +47,10 @@ int main(int argc, char **argv) {
             !touch(root.filePath("update.log")) ||
             !touch(root.filePath("Qt5Network.dll")) ||
             !touch(root.filePath("libssl-3-x64.dll")) ||
+            !touch(root.filePath("libssl-4-x64.dll")) ||
+            !touch(root.filePath("libcrypto-4-x64.dll")) ||
+            !touch(root.filePath("updater/libssl-4-x64.dll")) ||
+            !touch(root.filePath("updater/libcrypto-4-x64.dll")) ||
             !touch(root.filePath("imageformats/qjpeg.dll")) ||
             !touch(root.filePath("plugins/parser4chan.dll")) ||
             !touch(root.filePath("downloads/image.png")))
@@ -65,6 +71,8 @@ int main(int argc, char **argv) {
         << "updater/upd4t3r.exe" << "styles/custom-style.dll"
         << "settings.ini" << "black.list" << "fourchan-dl.log" << "update.log"
         << "Qt5Network.dll" << "libssl-3-x64.dll"
+        << "libssl-4-x64.dll" << "libcrypto-4-x64.dll"
+        << "updater/libssl-4-x64.dll" << "updater/libcrypto-4-x64.dll"
         << "imageformats/qjpeg.dll" << "plugins/parser4chan.dll"
         << "downloads/image.png";
     for (const QString &name : protectedFiles) {

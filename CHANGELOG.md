@@ -6,6 +6,7 @@
 - Combine board and status filters without sorting, deleting, or changing the positions of threads and tabs.
 - Keep column widths user-controlled and add automated checks for board URL parsing, the header click and stable row identity.
 - Package the complete Windows x64 portable ZIP and in-app updater executable, with GitHub Actions compilation and regression checks required before publication.
+- Match the updated Qt 5 Windows runtime with OpenSSL 4 in new portable installs, while retaining compatibility with existing OpenSSL 3 installations; strengthen legacy-cleanup safeguards for both runtimes.
 
 ## v1.0.0 — First complete Windows release
 - v0.6 audit follow-up: correct parser initialization-request indexing and strict official-host matching (including boards.4channel.org); correct thumbnail-size success reporting.

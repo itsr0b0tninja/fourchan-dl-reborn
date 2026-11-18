@@ -1242,8 +1242,20 @@ void MainWindow::createComponentList() {
 #ifdef Q_OS_WIN
     // Enumerate only Qt5 modules actually bundled with the release.
     qtFiles << "Qt5Core" << "Qt5Gui" << "Qt5Widgets" << "Qt5Network" << "Qt5Svg";
-    neededLibraries << "libssl-3-x64.dll" << "libcrypto-3-x64.dll"
-                    << "libstdc++-6.dll" << "libgcc_s_seh-1.dll"
+    // v1.0.0 installs contain OpenSSL 3, whereas newer Qt5 bundles use
+    // OpenSSL 4. Display the actual installed SSL pair for either layout.
+    const QDir appDir(QApplication::applicationDirPath());
+    const QStringList sslVersions = QStringList() << "4" << "3";
+    for (const QString &major : sslVersions) {
+        const QString ssl = QString("libssl-%1-x64.dll").arg(major);
+        const QString crypto = QString("libcrypto-%1-x64.dll").arg(major);
+        if (QFile::exists(appDir.filePath(ssl)) &&
+                QFile::exists(appDir.filePath(crypto))) {
+            neededLibraries << ssl << crypto;
+            break;
+        }
+    }
+    neededLibraries << "libstdc++-6.dll" << "libgcc_s_seh-1.dll"
                     << "libwinpthread-1.dll"
                     << "imageformats/qgif.dll" << "imageformats/qico.dll"
                     << "imageformats/qjpeg.dll" << "imageformats/qsvg.dll"
