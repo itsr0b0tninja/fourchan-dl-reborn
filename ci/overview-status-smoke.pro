@@ -1,4 +1,4 @@
-QT += core gui widgets
+QT += core gui widgets testlib
 TEMPLATE = app
 CONFIG += console c++11
 CONFIG -= app_bundle

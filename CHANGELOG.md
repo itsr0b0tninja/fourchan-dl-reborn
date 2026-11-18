@@ -1,5 +1,11 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.4.5 — Status header menu hotfix
+- Fix the missing Status filter popup: Qt disables clickable QTreeView headers when sorting is disabled, so re-enable header clicks after setting sorting off.
+- Keep all four overview columns manually resizable and sorting disabled. Preserve existing filter preferences and categories.
+- Add a Windows Qt regression test that physically clicks the Status header and verifies that sectionClicked(2) fires without enabling sorting or changing column widths.
+- This release only corrects the v0.4.4 header interaction; no additional overview features or UI redesign.
+
 ## v0.4.4 — Manual overview columns and Status header filter
 - Make Name, Images, Status and URI columns independently draggable, without ResizeToContents or automatic final-column stretching. Text may be clipped; full values are available via cell tooltips.
 - Clicking the existing Status column heading opens a single-choice status filter menu with counts for all open threads. Every status category appears even when its count is zero; All statuses clears filtering.

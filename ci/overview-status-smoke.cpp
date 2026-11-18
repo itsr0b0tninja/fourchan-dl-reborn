@@ -2,6 +2,8 @@
 #include <QHeaderView>
 #include <QTreeWidget>
 #include <QDebug>
+#include <QSignalSpy>
+#include <QTest>
 #include "overviewstatus.h"
 
 static bool check(const QString &actual, const char *expected, const char *test) {
@@ -52,6 +54,10 @@ int main(int argc, char **argv) {
     overview.header()->setStretchLastSection(false);
     for (int c = 0; c < 4; ++c)
         overview.header()->setSectionResizeMode(c, QHeaderView::Interactive);
+    // Reproduce the actual application setup order. QTreeView disables
+    // sectionsClickable when sorting is disabled; it must be restored after.
+    overview.setSortingEnabled(false);
+    overview.header()->setSectionsClickable(true);
     overview.setColumnWidth(0, 140);
     overview.setColumnWidth(1, 55);
     overview.setColumnWidth(2, 48);
@@ -66,6 +72,25 @@ int main(int argc, char **argv) {
     if (overview.columnWidth(2) != 48 || overview.columnWidth(3) != 90 ||
             overview.header()->sectionResizeMode(2) != QHeaderView::Interactive)
         return 3;
+
+    // Exercise a REAL click on the Status heading. Previous v0.4.4 tests
+    // verified categories but missed that setSortingEnabled(false) had
+    // silently disabled sectionClicked, leaving no menu available.
+    if (overview.isSortingEnabled() || !overview.header()->sectionsClickable())
+        return 7;
+    QSignalSpy statusClicks(overview.header(), SIGNAL(sectionClicked(int)));
+    const int statusX = overview.header()->sectionViewportPosition(2)
+                        + overview.header()->sectionSize(2) / 2;
+    QTest::mouseClick(overview.header()->viewport(), Qt::LeftButton,
+                      Qt::NoModifier,
+                      QPoint(statusX, overview.header()->height() / 2));
+    if (statusClicks.count() != 1 || statusClicks.at(0).at(0).toInt() != 2) {
+        qCritical() << "Status heading click did not fire sectionClicked(2):"
+                    << statusClicks.count();
+        return 8;
+    }
+    if (overview.isSortingEnabled() || overview.columnWidth(2) != 48)
+        return 9;
 
     // Filtering rows must not reorder or destroy them. The association with
     // the corresponding open tab remains stable, even for an empty filter.
@@ -85,7 +110,8 @@ int main(int argc, char **argv) {
             overview.indexOfTopLevelItem(second) != 1)
         return 6;
 
-    qInfo() << "PASS: complete status taxonomy, variable statuses,"
-               " zero-result filtering, stable row identity and manual widths";
+    qInfo() << "PASS: actual Status header click emits sectionClicked(2),"
+               " sorting stays disabled, manual widths, complete status taxonomy,"
+               " zero-result filtering and stable filtered-row identity";
     return 0;
 }

@@ -45,12 +45,15 @@ MainWindow::MainWindow(QWidget *parent) :
     // shorter) status, and never stretch the final URI column automatically.
     QHeaderView *overviewHeader = ui->threadOverview->header();
     overviewHeader->setStretchLastSection(false);
-    overviewHeader->setSectionsClickable(true);
     overviewHeader->setSectionsMovable(false);
     overviewHeader->setMinimumSectionSize(24);
     for (int column = 0; column < 4; ++column)
         overviewHeader->setSectionResizeMode(column, QHeaderView::Interactive);
+    // Qt QTreeView::setSortingEnabled(false) also turns OFF header clicks.
+    // Disable sorting first, then explicitly re-enable header clicks so
+    // sectionClicked(2) opens our Status menu without enabling sorting.
     ui->threadOverview->setSortingEnabled(false);
+    overviewHeader->setSectionsClickable(true);
 
     // Adding actions to menu bar
     ui->menuBar->addAction(ui->actionAdd_Tab);
