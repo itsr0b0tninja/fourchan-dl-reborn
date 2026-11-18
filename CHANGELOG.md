@@ -1,5 +1,15 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.4.4 — Manual overview columns and Status header filter
+- Make Name, Images, Status and URI columns independently draggable, without ResizeToContents or automatic final-column stretching. Text may be clipped; full values are available via cell tooltips.
+- Clicking the existing Status column heading opens a single-choice status filter menu with counts for all open threads. Every status category appears even when its count is zero; All statuses clears filtering.
+- Show the active filter in the Status heading and a check beside the selected menu entry. Classify changing retry times as Retry Pending and removed/404 threads as Ended / Removed.
+- Update row visibility automatically as download statuses change. Filtering never stops or removes a thread, and hides rows instead of reordering them.
+- Bind each overview row to its thread widget rather than assuming its visible position matches the tab index. Preserve the active-thread marker and new-image highlighting.
+- Remember the filter and all four manually chosen column widths across launches. Debounce width persistence during drags and do not reset widths when the main Settings Apply button is used.
+- Add an offscreen Qt regression test for status classification (including zero-result filters), manual headers and stable filtered-row indexes.
+- Preserve the existing docked overview and thread settings layout; no search, sorting, extra toolbar or additional thread-management actions.
+
 ## v0.4.2 — Consistent Fusion themes and Settings Apply
 - Use Qt Fusion controls for both Light and Dark, retaining Dark's charcoal palette and selection colours while giving Light a soft grey/white palette and matching control styling.
 - Preserve Light as the default theme, and remember the selected theme between launches.

@@ -63,6 +63,10 @@ private:
     ThumbnailRemover* thumbnailRemover;
     int oldActiveTabIndex;
     QTimer* overviewUpdateTimer;
+    QTimer* overviewWidthSaveTimer;
+    QHash<QTreeWidgetItem*, QPointer<UIImageOverview> > overviewRowTabs;
+    QString overviewStatusFilter;
+    bool overviewWidthsRestored;
     QMenu* historyMenu;
     bool _updateOverview;
     QMap<QString, component_information> components;
@@ -80,6 +84,8 @@ private:
 
     void restoreWindowSettings(void);
     void updateWidgetSettings(void);
+    void applyOverviewStatusFilter();
+    void refreshOverviewStatusHeader();
     void checkVersion(QString ver);
     void checkForUpdates(QString xml, bool manual);
     void scheduleNextPeriodicUpdateCheck();
@@ -137,6 +143,9 @@ private slots:
     void debugButton();
     void overviewTimerTimeout();
     void scheduleOverviewUpdate();
+    void showOverviewStatusFilter(int section);
+    void scheduleOverviewWidthSave();
+    void saveOverviewWidths();
     void restoreFromHistory(QAction*);
     void processRequestResponse(QUrl url, QByteArray ba, bool cached);
     void updaterConnected();

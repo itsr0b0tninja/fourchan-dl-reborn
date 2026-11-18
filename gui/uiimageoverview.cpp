@@ -495,6 +495,9 @@ void UIImageOverview::errorHandler(QUrl url, int err) {
         if (isDownloadFinished() && failedImageUrls.isEmpty()
                 && missingImageUrls.isEmpty()) {
             stop();
+            // Keep ended threads filterable when automatic close is disabled.
+            // stop() otherwise leaves the visible Status as merely "Stopped".
+            setStatus("Thread removed");
             setTabTitle("Thread 404'ed");
             emit errorMessage("404 - Thread not found");
             emit closeRequest(this, 404);
@@ -508,6 +511,8 @@ void UIImageOverview::errorHandler(QUrl url, int err) {
         emit errorMessage("Thread request failed after retries: " + uri);
         break;
     case 999:
+        // Preserve this error state in Status as well as the tab title.
+        setStatus("Banned");
         setTabTitle("Banned");
         emit errorMessage("You are banned");
         break;

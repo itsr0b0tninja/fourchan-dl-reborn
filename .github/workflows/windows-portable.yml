@@ -69,6 +69,8 @@ jobs:
           mingw32-make -j2
           qmake-qt5 theme-smoke.pro
           mingw32-make -j2
+          qmake-qt5 overview-status-smoke.pro
+          mingw32-make -j2
           # Run against the real Qt widget palette and style while the full
           # MSYS2 runtime (including the offscreen platform plugin) is present.
           if ! QT_QPA_PLATFORM=offscreen ../portable/theme-smoke.exe; then
@@ -76,6 +78,10 @@ jobs:
             exit 1
           fi
           rm -f ../portable/theme-smoke.exe
+          # Verify the complete status filter categories, fixed manual header
+          # widths and that hiding rows leaves their original indexes intact.
+          QT_QPA_PLATFORM=offscreen ../portable/overview-status-smoke.exe
+          rm -f ../portable/overview-status-smoke.exe
           popd
           echo "Built executable files:"
           find . -maxdepth 3 -name '*.exe' -o -name 'parser4chan.dll'

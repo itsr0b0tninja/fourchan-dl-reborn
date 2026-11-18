@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QHeaderView>
 #include "apptheme.h"
+#include "overviewstatus.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -40,8 +41,16 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(this, SIGNAL(removeFiles(QStringList)), thumbnailRemover, SLOT(removeFiles(QStringList)));
     ui->setupUi(this);
-    // Keep full per-thread retry times visible in the Status column.
-    ui->threadOverview->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    // Manual widths on ALL four columns. Never resize to fit a longer (or
+    // shorter) status, and never stretch the final URI column automatically.
+    QHeaderView *overviewHeader = ui->threadOverview->header();
+    overviewHeader->setStretchLastSection(false);
+    overviewHeader->setSectionsClickable(true);
+    overviewHeader->setSectionsMovable(false);
+    overviewHeader->setMinimumSectionSize(24);
+    for (int column = 0; column < 4; ++column)
+        overviewHeader->setSectionResizeMode(column, QHeaderView::Interactive);
+    ui->threadOverview->setSortingEnabled(false);
 
     // Adding actions to menu bar
     ui->menuBar->addAction(ui->actionAdd_Tab);
@@ -68,6 +77,18 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->menuBar->addAction(ui->actionShowInfo);
 
     settings = new QSettings("settings.ini", QSettings::IniFormat);
+    overviewWidthsRestored = false;
+    overviewStatusFilter = settings->value("thread_overview/status_filter", "all")
+                           .toString().trimmed().toLower();
+    if (!OverviewStatus::keys().contains(overviewStatusFilter))
+        overviewStatusFilter = QStringLiteral("all");
+    refreshOverviewStatusHeader();
+
+    overviewWidthSaveTimer = new QTimer(this);
+    overviewWidthSaveTimer->setInterval(500);
+    overviewWidthSaveTimer->setSingleShot(true);
+    connect(overviewWidthSaveTimer, SIGNAL(timeout()), this, SLOT(saveOverviewWidths()));
+
     ui->tabWidget->removeTab(0);
     oldActiveTabIndex = 0;
     pendingThumbnailsChanged(0);
@@ -79,6 +100,13 @@ MainWindow::MainWindow(QWidget *parent) :
     loadOptions();
     restoreWindowSettings();
     updateWidgetSettings();
+
+    // Connect after initial width restoration so those initial resize signals
+    // do not accidentally overwrite the user's saved column widths.
+    connect(overviewHeader, SIGNAL(sectionResized(int,int,int)),
+            this, SLOT(scheduleOverviewWidthSave()));
+    connect(overviewHeader, SIGNAL(sectionClicked(int)),
+            this, SLOT(showOverviewStatusFilter(int)));
 
     connect(requestHandler, SIGNAL(response(QUrl,QByteArray,bool)), this, SLOT(processRequestResponse(QUrl,QByteArray,bool)));
     connect(requestHandler, SIGNAL(responseError(QUrl,int)), this, SLOT(githubUpdateCheckFailed(QUrl,int)));
@@ -238,6 +266,9 @@ void MainWindow::closeTab(int i) {
         QLOG_TRACE() << Q_FUNC_INFO << "Adding new tab, because no tab is left";
         addTab();
     }
+    // Keep the overview's row-to-tab associations current after a close,
+    // including when the user has an active status filter.
+    scheduleOverviewUpdate();
 }
 
 
@@ -431,6 +462,7 @@ void MainWindow::saveSettings(void) {
     settings->setValue("col_name_width", ui->threadOverview->columnWidth(0));
     settings->setValue("col_images_width", ui->threadOverview->columnWidth(1));
     settings->setValue("col_status_width", ui->threadOverview->columnWidth(2));
+    settings->setValue("status_filter", overviewStatusFilter);
     settings->setValue("visible", ui->threadOverview->isVisible());
     settings->endGroup();
 
@@ -512,15 +544,21 @@ void MainWindow::loadOptions(void) {
 
     settings->endGroup();
 
-    // Dock widget
-    settings->beginGroup("thread_overview");
-//    ui->dockWidget->resize();
-//    settings->setValue("width", ui->dockWidget->width());
-    ui->threadOverview->setColumnWidth(3, settings->value("col_uri_width", 170).toInt());
-    ui->threadOverview->setColumnWidth(0, settings->value("col_name_width", 190).toInt());
-    ui->threadOverview->setColumnWidth(1, settings->value("col_images_width", 60).toInt());
-    ui->threadOverview->setColumnWidth(2, settings->value("col_status_width", 70).toInt());
-    settings->endGroup();
+    // Column widths are a user-controlled overview preference. Restore once
+    // at startup, not every time Settings -> Apply refreshes global options.
+    if (!overviewWidthsRestored) {
+        settings->beginGroup("thread_overview");
+        ui->threadOverview->setColumnWidth(
+                    0, qMax(24, settings->value("col_name_width", 190).toInt()));
+        ui->threadOverview->setColumnWidth(
+                    1, qMax(24, settings->value("col_images_width", 60).toInt()));
+        ui->threadOverview->setColumnWidth(
+                    2, qMax(24, settings->value("col_status_width", 70).toInt()));
+        ui->threadOverview->setColumnWidth(
+                    3, qMax(24, settings->value("col_uri_width", 170).toInt()));
+        settings->endGroup();
+        overviewWidthsRestored = true;
+    }
 }
 
 void MainWindow::processCloseRequest(UIImageOverview* w, int reason) {
@@ -699,13 +737,14 @@ void MainWindow::addMultipleTabs() {
 }
 
 void MainWindow::showTab(QTreeWidgetItem* item, int idx) {
-    int index;
-
-    index = ui->threadOverview->indexOfTopLevelItem(item);
-
-    if (index != -1) {
+    Q_UNUSED(idx);
+    // Do NOT derive a tab index from a visual row. Row visibility changes
+    // under filtering, and tabs can close while the overview is updating.
+    const QPointer<UIImageOverview> thread = overviewRowTabs.value(item);
+    const int index = thread ? ui->tabWidget->indexOf(thread.data()) : -1;
+    if (index >= 0) {
         ui->tabWidget->setCurrentIndex(index);
-        ((UIImageOverview*)(ui->tabWidget->currentWidget()))->threadViewed();
+        thread->threadViewed();
     }
 }
 
@@ -728,64 +767,130 @@ void MainWindow::overviewTimerTimeout() {
 }
 
 void MainWindow::updateThreadOverview() {
-//    QList<QTreeWidgetItem *> items;
-    QStringList sl;
+    if (!ui->threadOverview->isVisible())
+        return;
 
-    if (ui->threadOverview->isVisible()) {
-//        QLOG_TRACE() << "MainWindow :: updating thread overview";
-//        ui->threadOverview->clear();
+    // Keep item identity aligned with the original tab, even when the item
+    // is hidden by a status filter. No sorting or row removal for filtering.
+    for (int i = 0; i < ui->tabWidget->count(); ++i) {
+        UIImageOverview *tab = static_cast<UIImageOverview*>(ui->tabWidget->widget(i));
+        QStringList columns;
+        columns << tab->getTitle()
+                << QString("%1/%2").arg(tab->getDownloadedImagesCount())
+                                   .arg(tab->getTotalImagesCount())
+                << tab->getStatus()
+                << tab->getURI();
 
-        for (int i=0; i<ui->tabWidget->count(); i++) {
-            UIImageOverview* tab;
-            QTreeWidgetItem* item;
-            sl.clear();
-
-            tab = (UIImageOverview*)(ui->tabWidget->widget(i));
-            sl << tab->getTitle();
-            sl << QString("%1/%2").arg(tab->getDownloadedImagesCount()).arg(tab->getTotalImagesCount());
-            sl << tab->getStatus();
-            sl << tab->getURI();
-
-            QLOG_DEBUG() << Q_FUNC_INFO << "::" << i << ":" << sl;
-
-            if (ui->threadOverview->topLevelItemCount() > i) {                   // If there is an entry for the i-th tab
-                item = ui->threadOverview->topLevelItem(i);     //  change its content
-                QFont f = item->font(0);
-                for (int k=0; k<4; k++) {
-
-                    if (k == 0) {
-                        if (tab->hasNewImages()) {
-                            item->setTextColor(0, AppTheme::overviewNewImagesColor());
-                            f.setBold(true);
-                            item->setFont(0, f);
-                            QLOG_TRACE() << Q_FUNC_INFO << "tab" << i << "Changing font to bold/red";
-                        }
-                        else {
-                            item->setTextColor(0, AppTheme::overviewTextColor());
-                            f.setBold(false);
-                            item->setFont(0, f);
-                            QLOG_TRACE() << Q_FUNC_INFO << "tab" << i << "Changing font to normal";
-                        }
-                    }
-                    item->setText(k, sl.at(k));
-                }
-                item->setToolTip(2, sl.at(2));
-            }
-            else {                                              // Otherwise create a new one and append it
-                QTreeWidgetItem* newItem = new QTreeWidgetItem(sl);
-                newItem->setToolTip(2, sl.at(2));
-                ui->threadOverview->addTopLevelItem(newItem);
-            }
+        QTreeWidgetItem *item;
+        if (i < ui->threadOverview->topLevelItemCount()) {
+            item = ui->threadOverview->topLevelItem(i);
+        } else {
+            item = new QTreeWidgetItem(ui->threadOverview);
+        }
+        overviewRowTabs.insert(item, QPointer<UIImageOverview>(tab));
+        for (int column = 0; column < 4; ++column) {
+            item->setText(column, columns.at(column));
+            // Full contents remain accessible even when manually clipped.
+            item->setToolTip(column, columns.at(column));
         }
 
-        // Remove obsolete rows of overview (if any)
-        if (ui->threadOverview->topLevelItemCount() > ui->tabWidget->count()) {
-            for (int i=ui->threadOverview->topLevelItemCount(); i>=ui->tabWidget->count(); --i) {
-                ui->threadOverview->takeTopLevelItem(i);
-            }
-        }
-//        ui->threadOverview->insertTopLevelItems(0, items);
+        QFont nameFont = item->font(0);
+        nameFont.setBold(tab->hasNewImages());
+        item->setFont(0, nameFont);
+        item->setTextColor(0, tab->hasNewImages()
+                          ? AppTheme::overviewNewImagesColor()
+                          : AppTheme::overviewTextColor());
     }
+
+    while (ui->threadOverview->topLevelItemCount() > ui->tabWidget->count()) {
+        QTreeWidgetItem *obsolete = ui->threadOverview->takeTopLevelItem(
+                    ui->threadOverview->topLevelItemCount() - 1);
+        overviewRowTabs.remove(obsolete);
+        delete obsolete;
+    }
+
+    applyOverviewStatusFilter();
+    addThreadOverviewMark(ui->tabWidget->currentIndex());
+}
+
+void MainWindow::applyOverviewStatusFilter() {
+    for (int i = 0; i < ui->threadOverview->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *item = ui->threadOverview->topLevelItem(i);
+        const QPointer<UIImageOverview> tab = overviewRowTabs.value(item);
+        const bool matches = tab && (overviewStatusFilter == QLatin1String("all")
+                    || OverviewStatus::categoryFor(tab->getStatus()) == overviewStatusFilter);
+        item->setHidden(!matches);
+    }
+}
+
+void MainWindow::refreshOverviewStatusHeader() {
+    const QString label = OverviewStatus::labelFor(overviewStatusFilter);
+    ui->threadOverview->headerItem()->setText(
+                2, overviewStatusFilter == QLatin1String("all")
+                   ? tr("Status") : tr("Status (%1)").arg(label));
+    ui->threadOverview->headerItem()->setToolTip(
+                2, overviewStatusFilter == QLatin1String("all")
+                   ? tr("Click to filter threads by status")
+                   : tr("Filter: %1 — click to change").arg(label));
+}
+
+void MainWindow::showOverviewStatusFilter(int section) {
+    if (section != 2)
+        return;
+
+    // Count ALL open threads, never just the currently visible subset.
+    // This also includes categories with zero matching threads.
+    QHash<QString, int> counts;
+    for (int i = 0; i < ui->tabWidget->count(); ++i) {
+        UIImageOverview *tab = static_cast<UIImageOverview*>(ui->tabWidget->widget(i));
+        const QString category = OverviewStatus::categoryFor(tab->getStatus());
+        counts[category] += 1;
+    }
+
+    QMenu menu(ui->threadOverview);
+    const QStringList categories = OverviewStatus::keys();
+    for (const QString &key : categories) {
+        const int count = key == QLatin1String("all")
+                          ? ui->tabWidget->count() : counts.value(key, 0);
+        QAction *action = menu.addAction(
+                    QString("%1 (%2)").arg(OverviewStatus::labelFor(key)).arg(count));
+        action->setCheckable(true);
+        action->setChecked(key == overviewStatusFilter);
+        action->setData(key);
+        if (key == QLatin1String("all"))
+            menu.addSeparator();
+    }
+
+    QHeaderView *header = ui->threadOverview->header();
+    const QPoint menuPoint = header->mapToGlobal(
+                QPoint(header->sectionViewportPosition(2), header->height()));
+    QAction *picked = menu.exec(menuPoint);
+    if (!picked)
+        return;
+    const QString requestedFilter = picked->data().toString();
+    if (!categories.contains(requestedFilter) || requestedFilter == overviewStatusFilter)
+        return;
+    overviewStatusFilter = requestedFilter;
+    settings->setValue("thread_overview/status_filter", overviewStatusFilter);
+    settings->sync();
+    refreshOverviewStatusHeader();
+    updateThreadOverview();
+}
+
+void MainWindow::scheduleOverviewWidthSave() {
+    // A drag emits a resize for every pixel. Debounce disk writes until the
+    // user stops resizing, while the existing close/autosave remains a backup.
+    overviewWidthSaveTimer->start();
+}
+
+void MainWindow::saveOverviewWidths() {
+    settings->beginGroup("thread_overview");
+    settings->setValue("col_name_width", ui->threadOverview->columnWidth(0));
+    settings->setValue("col_images_width", ui->threadOverview->columnWidth(1));
+    settings->setValue("col_status_width", ui->threadOverview->columnWidth(2));
+    settings->setValue("col_uri_width", ui->threadOverview->columnWidth(3));
+    settings->endGroup();
+    settings->sync();
 }
 
 void MainWindow::debugButton() {
@@ -1342,14 +1447,17 @@ void MainWindow::addThreadOverviewMark(QTreeWidgetItem* item) {
 }
 
 void MainWindow::addThreadOverviewMark(int index) {
-    QList<QTreeWidgetItem*> foundItems;
-
-    if (ui->tabWidget->count() > 0) {
-        foundItems = ui->threadOverview->findItems(((UIImageOverview*)(ui->tabWidget->widget(index)))->getURI(), Qt::MatchExactly, 3 );
-        if (foundItems.count() == 1) {
-            addThreadOverviewMark(foundItems.at(0));
+    if (index >= 0 && index < ui->tabWidget->count()) {
+        QWidget *active = ui->tabWidget->widget(index);
+        for (int i = 0; i < ui->threadOverview->topLevelItemCount(); ++i) {
+            QTreeWidgetItem *item = ui->threadOverview->topLevelItem(i);
+            if (overviewRowTabs.value(item).data() == active) {
+                addThreadOverviewMark(item);
+                return;
+            }
         }
     }
+    removeThreadOverviewMark();
 }
 
 void MainWindow::cleanThreadCache() {
