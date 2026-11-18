@@ -1,89 +1,136 @@
 ﻿#include "uiinfo.h"
 #include "ui_uiinfo.h"
+#include "componenttreelayout.h"
+#include <QFontDatabase>
+#include <QScrollBar>
+#include <QResizeEvent>
+#include <QShowEvent>
 UIInfo::UIInfo(QWidget *parent) :
     QDialog(parent),
-    ui(new Ui::UIInfo)
+    ui(new Ui::UIInfo),
+    latestAvailableVersion(tr("Not checked")),
+    uiReady(false)
 {
-    QString text;
     ui->setupUi(this);
-    updateStatistics();
-    uiPendingRequests = new UIPendingRequests(this);
+    uiReady = true;
+    // The Information tab is the first view on the first opening. The dialog
+    // stays alive in MainWindow, so switching tabs/expanding component branches
+    // remains intact throughout the running application session.
+    ui->tabWidget->setCurrentIndex(0);
+    ui->label_2->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    ui->label_2->setOpenExternalLinks(true);
+    ui->textEdit->setReadOnly(true);
+    ui->textEdit->setLineWrapMode(QPlainTextEdit::NoWrap);
+    ui->textEdit->setMaximumBlockCount(10000);
+    ui->textEdit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
 
+    uiPendingRequests = new UIPendingRequests(this);
     timer = new QTimer(this);
     timer->setInterval(3000);
     timer->setSingleShot(false);
     timer->start();
 
-    text = ui->label_2->text();
-#ifdef __DEBUG__
-    text.replace("%%VERSION%%", "DEBUG");
-#else
-    text.replace("%%VERSION%%", PROGRAM_VERSION);
-#endif
-    text.replace("%%BUILDDATE%%", BUILDDATE);
-    text.replace("%%QT_VERSION%%", QT_VERSION_STR);
-    ui->label_2->setText(text);
+    // All tree entries and values retain their original nesting.
+    // Changing tabs or reopening the window must not collapse branches.
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
+        if (index == 1)
+            resizeComponentColumns();
+    });
+
+    updateAboutText();
+    updateStatistics();
+    updateDebugInformation();
 
     connect(timer, SIGNAL(timeout()), this, SLOT(updateStatistics()));
     connect(timer, SIGNAL(timeout()), this, SLOT(updateDebugInformation()));
-
+    connect(timer, SIGNAL(timeout()), this, SLOT(updateLogFile()));
     connect(ui->btnShowRequests, SIGNAL(clicked()), this, SLOT(showRequests()));
     connect(uiPendingRequests, SIGNAL(reloadRequested()), this, SLOT(reloadRequests()));
     connect(this, SIGNAL(rejected()), uiPendingRequests, SLOT(hide()));
 
-    logFile = new QFile();
-    logFile->setFileName("fourchan-dl.log");
+    logFile = new QFile(QStringLiteral("fourchan-dl.log"), this);
     logFile->open(QIODevice::ReadOnly | QIODevice::Unbuffered | QIODevice::Text);
-
-    if (logFile->isReadable()) {
-        connect(timer, SIGNAL(timeout()), this, SLOT(updateLogFile()));
-    }
 }
 
-void UIInfo::setCurrentVersion(QString s) {
-    QString text;
+void UIInfo::setCurrentVersion(QString version) {
+    latestAvailableVersion = version.trimmed().isEmpty() ? tr("Not checked") : version.trimmed();
+    updateAboutText();
+}
 
-    text = ui->label_2->text();
-    text.replace("%%CURRENT_VERSION%%", s);
-    ui->label_2->setText(text);
+void UIInfo::updateAboutText() {
+#ifdef __DEBUG__
+    const QString installedVersion = QStringLiteral("DEBUG");
+#else
+    const QString installedVersion = QString::fromLatin1(PROGRAM_VERSION);
+#endif
+    // Use inherited palette colours rather than hard-coded black or blue,
+    // so this information is readable under both Fusion Light and Dark.
+    const QString html = QStringLiteral(
+        "<p style='margin-top:0px; margin-bottom:10px;'>"
+        "<b>4chan Downloader Reborn</b></p>"
+        "<p style='margin-top:0px; margin-bottom:10px;'>"
+        "Installed version: <b>%1</b><br/>"
+        "Latest available version: %2</p>"
+        "<p style='margin-top:0px; margin-bottom:10px;'>"
+        "Build date: %3<br/>"
+        "Built with Qt: %4</p>"
+        "<p style='margin-top:0px; margin-bottom:10px;'>"
+        "This software is provided as-is, without warranty.<br/>"
+        "Released under the GNU General Public License, version 3.</p>"
+        "<p style='margin-top:0px; margin-bottom:8px;'>"
+        "<a href='https://www.gnu.org/licenses/gpl-3.0.html'>Read the GPLv3 licence</a></p>"
+        "<p style='margin-top:0px; margin-bottom:0px;'>"
+        "<a href='https://github.com/itsr0b0tninja/fourchan-dl-reborn'>GitHub repository</a>"
+        " &nbsp;|&nbsp; "
+        "<a href='https://github.com/itsr0b0tninja/fourchan-dl-reborn/issues'>Report a bug</a>"
+        "</p>");
+    ui->label_2->setText(html.arg(installedVersion.toHtmlEscaped(),
+                                     latestAvailableVersion.toHtmlEscaped(),
+                                     QString::fromLatin1(BUILDDATE).toHtmlEscaped(),
+                                     QString::fromLatin1(QT_VERSION_STR).toHtmlEscaped()));
 }
 
 void UIInfo::updateStatistics() {
-    QString s;
-    QStringList sizePostfix;
-    int files, idx;
-    float kbyte;
-
-    sizePostfix << "KB" << "MB" << "GB" << "TB";
-
-    files = 0;
-    kbyte = 0;
-
-    downloadManager->getStatistics(&files, &kbyte);
-
-    for (idx=0; idx<sizePostfix.size(); idx++) {
-        if (kbyte>1024.0) {
-            kbyte /= 1024.0;
-        }
-        else {
-            break;
-        }
+    int files = 0;
+    float kilobytes = 0.0f;
+    downloadManager->getStatistics(&files, &kilobytes);
+    const QStringList units = QStringList() << "KB" << "MB" << "GB" << "TB";
+    int index = 0;
+    while (kilobytes >= 1024.0f && index < units.size() - 1) {
+        kilobytes /= 1024.0f;
+        ++index;
     }
-
-    s = QString("You have downloaded\n%1 files\n%2 %3").arg(files).arg(kbyte).arg(sizePostfix.value(idx));
-
-    ui->lStatistics->setText(s);
+    ui->lStatistics->setText(
+                tr("Downloaded\n%1 files\n%2 %3")
+                .arg(files)
+                .arg(QString::number(kilobytes, 'f', 1))
+                .arg(units.at(index)));
 }
 
 void UIInfo::updateDebugInformation() {
-    QString str;
+    ui->lDebugInformation->setText(
+                tr("Pending requests: %1     Running requests: %2")
+                .arg(downloadManager->getPendingRequests())
+                .arg(downloadManager->getRunningRequests()));
+}
 
-    str = QString("Pending requests: %1<br />" \
-                  "Running requests: %2")
-            .arg(downloadManager->getPendingRequests())
-            .arg(downloadManager->getRunningRequests());
+void UIInfo::resizeComponentColumns() {
+    // setupUi can resize the dialog before its child tree is constructed.
+    if (uiReady)
+        ComponentTreeLayout::sizeColumns(ui->pluginInfo);
+}
 
-    ui->lDebugInformation->setText(str);
+void UIInfo::resizeEvent(QResizeEvent *event) {
+    QDialog::resizeEvent(event);
+    resizeComponentColumns();
+}
+
+void UIInfo::showEvent(QShowEvent *event) {
+    QDialog::showEvent(event);
+    resizeComponentColumns();
+    updateStatistics();
+    updateDebugInformation();
+    updateLogFile();
 }
 
 void UIInfo::loadComponentInfo(QMap<QString, component_information> components) {
@@ -93,6 +140,11 @@ void UIInfo::loadComponentInfo(QMap<QString, component_information> components) 
     QStringList keys;
     QMap<QString,QString> replacementStrings;
 
+    // Restore expanded groups and plugin detail branches if a component list
+    // is refreshed while the application remains open.
+    const QSet<QString> expanded = ComponentTreeLayout::expandedPaths(ui->pluginInfo);
+    ui->pluginInfo->setUpdatesEnabled(false);
+    ui->pluginInfo->clear();
     twi = 0;
     keys = components.keys();
     QTreeWidgetItem* pluginTree = new QTreeWidgetItem(ui->pluginInfo);
@@ -166,21 +218,35 @@ void UIInfo::loadComponentInfo(QMap<QString, component_information> components) 
                 version->setText(1, c.version);
             }
         }
-//        ui->pluginInfo->addTopLevelItem(pluginTree);
-//        ui->pluginInfo->addTopLevelItem(qtTree);
-//        ui->pluginInfo->addTopLevelItem(executableTree);
     }
 
-//    ui->pluginInfo->expandAll();
+    ComponentTreeLayout::restoreExpandedPaths(ui->pluginInfo, expanded);
+    ui->pluginInfo->setUpdatesEnabled(true);
+    resizeComponentColumns();
 }
 
 void UIInfo::updateLogFile() {
-    if (logFile->isReadable()) {
-        while (!logFile->atEnd()) {
-            ui->textEdit->append(QString(logFile->readLine()).simplified());
-        }
-//        ui->textEdit->setText(QString(logFile->readAll()));
+    if (!logFile || !logFile->isReadable())
+        return;
+
+    // Keep indentation and exact log content. Never simplify whitespace or
+    // parse log lines as rich text. Preserve the user's scroll position while
+    // reviewing older diagnostics, and follow new lines only at the bottom.
+    QStringList lines;
+    while (!logFile->atEnd()) {
+        QString line = QString::fromUtf8(logFile->readLine());
+        while (line.endsWith(QLatin1Char('\n')) || line.endsWith(QLatin1Char('\r')))
+            line.chop(1);
+        lines << line;
     }
+    if (lines.isEmpty())
+        return;
+
+    QScrollBar *scroll = ui->textEdit->verticalScrollBar();
+    const bool follow = scroll->value() >= scroll->maximum() - 2;
+    const int position = scroll->value();
+    ui->textEdit->appendPlainText(lines.join(QStringLiteral("\n")));
+    scroll->setValue(follow ? scroll->maximum() : position);
 }
 
 UIInfo::~UIInfo()

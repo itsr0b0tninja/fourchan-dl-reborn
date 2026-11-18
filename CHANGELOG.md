@@ -1,5 +1,16 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.4.6 — Program Information cleanup
+- Tidy the existing three-tab Program Information dialog without enlarging or redesigning it. Open on the main program information tab by default.
+- Present the installed/latest version, build date, Qt build version, download totals, warranty and GPLv3 details clearly; show "Not checked" until the updater has provided a latest version.
+- Replace the obsolete SourceForge issue tracker with links to the current GitHub repository and GitHub issues.
+- Correct the Components tree's truncated labels by sizing its first column for full labels AND nested indentation, allocating remaining space to values, and using horizontal scrolling rather than squeezing when narrow.
+- Preserve the existing Plugins, Executables, Qt, External libraries and Not categorized groups, including all plugin version, author, domain and formatting entries.
+- Remember expanded component groups and plugin branches when the dialog is hidden/reopened in the same application session, including when the component list refreshes.
+- Improve Debug Information readability: keep live request counts and Pending Requests viewer; show a read-only fixed-width, non-wrapping log that preserves original spacing and the user's scroll position.
+- Match both Fusion Light and Dark palettes without hard-coded text/link colours; avoid downloader, parser, threading, updater or settings format changes.
+- Add an offscreen Windows Qt regression test for the actual dialog layout, indentation-aware component widths, horizontal scrolling and expanded-branch memory.
+
 ## v0.4.5 — Status header menu hotfix
 - Fix the missing Status filter popup: Qt disables clickable QTreeView headers when sorting is disabled, so re-enable header clicks after setting sorting off.
 - Keep all four overview columns manually resizable and sorting disabled. Preserve existing filter preferences and categories.

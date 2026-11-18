@@ -5,6 +5,9 @@
 #include <QUrl>
 #include <QtNetwork>
 #include <QFile>
+#include <QString>
+#include <QResizeEvent>
+#include <QShowEvent>
 #include "downloadmanager.h"
 #include "pluginmanager.h"
 #include "uipendingrequests.h"
@@ -31,7 +34,15 @@ private:
     QTimer* timer;
     QFile* logFile;
     UIPendingRequests* uiPendingRequests;
+    QString latestAvailableVersion;
+    bool uiReady;
 
+    void updateAboutText();
+    void resizeComponentColumns();
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private slots:
     void updateStatistics();

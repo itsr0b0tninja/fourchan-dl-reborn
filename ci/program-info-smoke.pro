@@ -1,0 +1,10 @@
+QT += core gui widgets
+TEMPLATE = app
+CONFIG += console c++11
+CONFIG -= app_bundle
+TARGET = program-info-smoke
+DESTDIR = ../portable
+INCLUDEPATH += ../gui
+SOURCES += program-info-smoke.cpp
+HEADERS += ../gui/componenttreelayout.h
+FORMS += ../gui/uiinfo.ui

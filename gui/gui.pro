@@ -68,6 +68,7 @@ HEADERS  += mainwindow.h \
     thumbnailremover.h \
     threadfilemover.h \
     apptheme.h \
+    componenttreelayout.h \
     overviewstatus.h \
     uipendingrequests.h \
     HtmlEntities.h
@@ -92,7 +93,7 @@ os2: RC_FILE = fourchan-dl-os2.rc
 macx: ICON = resources/fourchan-dl.icns
 
 BUILDDATE = __DATE__
-VERSION = 0.4.5
+VERSION = 0.4.6
 DEFINES += BUILDDATE=$${BUILDDATE} PROGRAM_VERSION="\\\"$${VERSION}\\\"" __GUI__
 #DEFINES += QT_NO_URL_CAST_FROM_STRING
 #DEFINES += QT_NO_CAST_FROM_ASCII
