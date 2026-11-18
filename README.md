@@ -1,52 +1,34 @@
 # 4Chan Downloader Reborn
 
-A maintained, portable Windows build of the original **fourchan-dl** downloader, updated for 4chan's JSON API.
+**4Chan Downloader Reborn** is a portable Windows app for downloading files from 4chan threads and keeping track of new posts. It's an updated version of the original [fourchan-dl](https://sourceforge.net/projects/fourchan-dl/), with support for 4chan's JSON API.
 
-**Latest published release:** [Download the Windows x64 portable version](https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest).
-
-**Current source:** `master` always shows the newest source. Releases are automatically published after successful Windows compilation, SSL verification, and the streaming file test when the version number increases.
-
-## Download and updating
-
-1. Download the portable ZIP from the latest GitHub Release.
-2. Extract into its own folder and run `4chan-dl-reborn.exe`.
-3. For later **published** versions use **Check for Updates** inside the program, then install the offered update.
-
-For v1.0.0, the GitHub Release includes a complete Windows x64 portable ZIP containing the application, 4chan parser, standalone updater and required runtime libraries. Existing installations can continue using Check for Updates. The portable ZIP should be extracted to a fresh directory, not over an installation containing personal data.
+[**Download the latest release**](https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest) · [Changelog](CHANGELOG.md)
 
 ## Features
 
-- Download images and WebM attachments from 4chan threads.
-- Monitor multiple threads and automatically check for new attachments.
-- Resume monitoring previously opened tabs after restarting.
-- Thumbnail browser, folder shortcuts, and basic per-file actions.
-- Portable Qt 5 application with a built-in updater linked to this repository.
-- Robust streamed attachment downloads, retries, and video CDN request headers.
-- Qt5 Fusion Light/Dark themes and the simplified Thread Overview status filter.
-- Curated portable image plugins and narrowly scoped removal of known obsolete Qt4/old updater files; user data is never targeted.
-- v1.0.0: audited application source, streamlined repository, corrected parser-domain handling, updated licensing notice and a version-free window title.
+- **Thread monitoring:** Open several threads in separate tabs, automatically rescan for new attachments, or refresh a thread manually.
+- **Images and video:** Download images, WebM and MP4 files. Choose whether to download videos globally or override the setting for individual threads.
+- **Reliable downloads:** Configurable concurrent downloads, automatic retries and retry delays, including handling for temporary rate limits.
+- **Thumbnail browser:** Browse saved images as thumbnails, rebuild the thumbnail cache, and open or remove individual files.
+- **Image viewer:** View images inside the app, navigate between them, rotate them, or open them in an external viewer.
+- **Folder management:** Choose a download location per thread, save folder shortcuts, retain original filenames, and move a thread's files to the configured destination.
+- **Thread Overview:** See thread status and image counts in one place, filter threads by status, and mark threads as viewed.
+- **Session and history:** Reopen tabs from your previous session and restore recently closed threads from the History menu.
+- **Controls and preferences:** Start, pause or stop downloads; configure rescan intervals, a file blacklist, thumbnail settings and network proxy options.
+- **Desktop integration:** Light and dark themes, system tray support, and built-in update checks.
 
-**Scope:** The Windows portable release currently includes the 4chan parser. Historical support for other imageboards in upstream code is not included in the release package.
+## Getting started
 
-The current source tree contains only the supported Windows GUI, 4chan parser, standalone updater and active build/tests. Unshipped historical parsers and the discontinued console frontend were removed from `master` during repository cleanup; previous versions remain available through Git history.
+1. Download the **Windows x64 portable ZIP** from the [latest release](https://github.com/itsr0b0tninja/fourchan-dl-reborn/releases/latest).
+2. Extract it into its own folder and run `4chan-dl-reborn.exe`. No installer is needed.
+3. Select **Add thread**, paste a 4chan thread URL, choose where to save the files, and start downloading.
 
-## Project workflow
+The app supports 4chan and its official 4channel.org addresses. Other imageboards are not supported.
 
-This repository intentionally uses **one source branch: `master`**.
+To update an existing installation, use **Check for Updates** in the app. For a fresh installation, extract the ZIP to a new folder rather than over an existing copy containing your settings or downloads.
 
-- Work in progress is committed directly to `master` and built through GitHub Actions.
-- New versions are automatically published through GitHub **Releases** once CI succeeds; local application testing follows publication.
-- Version tags (`v0.1`, `v0.1.1`, etc.) retain precise source snapshots for recovery or rollback.
-- The application checks published releases, not every commit to `master`.
+## Licence and credits
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+Released under the [GNU General Public License v3](LICENSE). Third-party components retain their own licences.
 
-## Licensing
-
-The project remains available under GNU GPL version 3. The [LICENSE](LICENSE) file contains the full, unaltered GPLv3 text followed by an updated project-specific licensing and attribution notice. The original authors and subsequent contributors retain their respective copyrights. Bundled third-party components retain their own licences.
-
-The main window displays **4Chan Downloader Reborn** without a version suffix. The installed version is still available in Program Information and remains essential to update checking and releases.
-
-## Credits
-
-Fork of [fourchan-dl](https://sourceforge.net/projects/fourchan-dl/). The upstream project history and authorship remain credited.
+Based on the original [fourchan-dl](https://sourceforge.net/projects/fourchan-dl/). Credit for the original code remains with its authors, alongside the contributors to this version.
