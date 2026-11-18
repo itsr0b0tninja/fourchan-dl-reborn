@@ -66,6 +66,7 @@ private:
     QTimer* overviewWidthSaveTimer;
     QHash<QTreeWidgetItem*, QPointer<UIImageOverview> > overviewRowTabs;
     QString overviewStatusFilter;
+    QString overviewBoardFilter;
     bool overviewWidthsRestored;
     QMenu* historyMenu;
     bool _updateOverview;
@@ -84,8 +85,10 @@ private:
 
     void restoreWindowSettings(void);
     void updateWidgetSettings(void);
-    void applyOverviewStatusFilter();
+    void applyOverviewFilters();
     void refreshOverviewStatusHeader();
+    void refreshOverviewBoardHeader();
+    void showOverviewBoardFilter();
     void checkVersion(QString ver);
     void checkForUpdates(QString xml, bool manual);
     void scheduleNextPeriodicUpdateCheck();
@@ -143,7 +146,7 @@ private slots:
     void debugButton();
     void overviewTimerTimeout();
     void scheduleOverviewUpdate();
-    void showOverviewStatusFilter(int section);
+    void showOverviewFilter(int section);
     void scheduleOverviewWidthSave();
     void saveOverviewWidths();
     void restoreFromHistory(QAction*);

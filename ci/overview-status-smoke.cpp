@@ -5,6 +5,7 @@
 #include <QSignalSpy>
 #include <QTest>
 #include "overviewstatus.h"
+#include "overviewboard.h"
 
 static bool check(const QString &actual, const char *expected, const char *test) {
     if (actual == QLatin1String(expected)) return true;
@@ -46,6 +47,33 @@ int main(int argc, char **argv) {
             return 2;
     }
 
+    // Board parsing uses an exact URL path segment on an official host.
+    const struct { const char *url; const char *board; } boardCases[] = {
+        {"https://boards.4chan.org/b/thread/1234", "b"},
+        {"http://boards.4chan.org/s/res/1234", "s"},
+        {"https://boards.4channel.org/r9k/thread/4567", "r9k"},
+        {"boards.4channel.org/r9k/thread/4567", "r9k"},
+        {"https://boards.4chan.org/banned/thread/1234", "banned"},
+        {"https://boards.4chan.org/", ""},
+        {"", ""},
+        {"https://other.example/b/thread/1234", ""},
+        {"https://boards.4chan.org.evil.example/b/thread/1234", ""},
+        {"https://fake4chan.org/b/thread/1234", ""},
+        {"https://other.example/?next=/b/", ""},
+        {"ftp://boards.4chan.org/b/thread/1234", ""}
+    };
+    for (const auto &test : boardCases) {
+        if (!check(OverviewBoard::boardForUrl(QLatin1String(test.url)),
+                   test.board, test.url))
+            return 10;
+    }
+    if (OverviewBoard::normalizeFilter(QStringLiteral(" R9K ")) != QLatin1String("r9k") ||
+        !OverviewBoard::normalizeFilter(QStringLiteral("/b/")).isEmpty() ||
+        !OverviewBoard::matchesFilter(QStringLiteral(""), QString()) ||
+        OverviewBoard::matchesFilter(QStringLiteral("https://boards.4chan.org/b/thread/1"),
+                                     QStringLiteral("r9k")))
+        return 11;
+
     // Actual Qt headers must remain manually sized even for long statuses
     // or after changing the Status header to show an active filter.
     QTreeWidget overview;
@@ -64,13 +92,17 @@ int main(int argc, char **argv) {
     overview.setColumnWidth(3, 90);
     QTreeWidgetItem *first = new QTreeWidgetItem(&overview);
     first->setText(2, "Finished (retry 23:45:01)");
+    first->setText(3, "https://boards.4chan.org/b/thread/100");
     QTreeWidgetItem *second = new QTreeWidgetItem(&overview);
     second->setText(2, "Thread removed");
+    second->setText(3, "https://boards.4channel.org/r9k/thread/200");
     overview.headerItem()->setText(2, "Status (Ended / Removed)");
+    overview.headerItem()->setText(3, "URI (/r9k/)");
     overview.show();
     QApplication::processEvents();
     if (overview.columnWidth(2) != 48 || overview.columnWidth(3) != 90 ||
-            overview.header()->sectionResizeMode(2) != QHeaderView::Interactive)
+            overview.header()->sectionResizeMode(2) != QHeaderView::Interactive ||
+            overview.header()->sectionResizeMode(3) != QHeaderView::Interactive)
         return 3;
 
     // Exercise a REAL click on the Status heading. Previous v0.4.4 tests
@@ -92,6 +124,35 @@ int main(int argc, char **argv) {
     if (overview.isSortingEnabled() || overview.columnWidth(2) != 48)
         return 9;
 
+    // URI is also a clickable menu header, without sorting or resizing.
+    QSignalSpy uriClicks(overview.header(), SIGNAL(sectionClicked(int)));
+    const int uriX = overview.header()->sectionViewportPosition(3)
+                     + overview.header()->sectionSize(3) / 2;
+    QTest::mouseClick(overview.header()->viewport(), Qt::LeftButton,
+                      Qt::NoModifier,
+                      QPoint(uriX, overview.header()->height() / 2));
+    if (uriClicks.count() != 1 || uriClicks.at(0).at(0).toInt() != 3)
+        return 12;
+    if (overview.isSortingEnabled() || overview.columnWidth(3) != 90)
+        return 13;
+
+    // The two filters are combined with AND, not applied sequentially to
+    // already hidden rows (so clearing either filter restores matches).
+    const QString status = QStringLiteral("ended");
+    const QString board = QStringLiteral("r9k");
+    first->setHidden(!(OverviewStatus::categoryFor(first->text(2)) == status &&
+                       OverviewBoard::matchesFilter(first->text(3), board)));
+    second->setHidden(!(OverviewStatus::categoryFor(second->text(2)) == status &&
+                        OverviewBoard::matchesFilter(second->text(3), board)));
+    if (!first->isHidden() || second->isHidden() ||
+            overview.indexOfTopLevelItem(first) != 0 ||
+            overview.indexOfTopLevelItem(second) != 1)
+        return 14;
+    first->setHidden(!OverviewBoard::matchesFilter(first->text(3), QString()));
+    second->setHidden(!OverviewBoard::matchesFilter(second->text(3), QString()));
+    if (first->isHidden() || second->isHidden())
+        return 15;
+
     // Filtering rows must not reorder or destroy them. The association with
     // the corresponding open tab remains stable, even for an empty filter.
     first->setHidden(true);
@@ -110,8 +171,9 @@ int main(int argc, char **argv) {
             overview.indexOfTopLevelItem(second) != 1)
         return 6;
 
-    qInfo() << "PASS: actual Status header click emits sectionClicked(2),"
+    qInfo() << "PASS: Status and URI header clicks emit sectionClicked,"
                " sorting stays disabled, manual widths, complete status taxonomy,"
-               " zero-result filtering and stable filtered-row identity";
+               " exact board URL detection, AND-filtering, zero-result filtering"
+               " and stable filtered-row identity";
     return 0;
 }

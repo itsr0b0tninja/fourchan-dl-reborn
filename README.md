@@ -12,7 +12,7 @@
 - **Thumbnail browser:** Browse saved images as thumbnails, rebuild the thumbnail cache, and open or remove individual files.
 - **Image viewer:** View images inside the app, navigate between them, rotate them, or open them in an external viewer.
 - **Folder management:** Choose a download location per thread, save folder shortcuts, retain original filenames, and move a thread's files to the configured destination.
-- **Thread Overview:** See thread status and image counts in one place, filter threads by status, and mark threads as viewed.
+- **Thread Overview:** See thread status and image counts in one place, filter threads by status or board (such as `/b/` and `/r9k/`), and mark threads as viewed.
 - **Session and history:** Reopen tabs from your previous session and restore recently closed threads from the History menu.
 - **Controls and preferences:** Start, pause or stop downloads; configure rescan intervals, a file blacklist, thumbnail settings and network proxy options.
 - **Desktop integration:** Light and dark themes, system tray support, and built-in update checks.

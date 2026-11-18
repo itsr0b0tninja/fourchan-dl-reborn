@@ -72,6 +72,7 @@ HEADERS  += mainwindow.h \
     componenttreelayout.h \
     legacyruntimecleanup.h \
     overviewstatus.h \
+    overviewboard.h \
     uipendingrequests.h \
     HtmlEntities.h
 
@@ -93,7 +94,7 @@ include(QsLog.pri)
 win32: RC_FILE = fourchan-dl-win.rc
 
 BUILDDATE = __DATE__
-VERSION = 1.0.0
+VERSION = 1.0.1
 DEFINES += BUILDDATE=$${BUILDDATE} PROGRAM_VERSION="\\\"$${VERSION}\\\"" __GUI__
 
 win32: LIBS += -lole32

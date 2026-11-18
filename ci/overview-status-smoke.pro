@@ -6,4 +6,4 @@ TARGET = overview-status-smoke
 DESTDIR = ../portable
 INCLUDEPATH += ../gui
 SOURCES += overview-status-smoke.cpp
-HEADERS += ../gui/overviewstatus.h
+HEADERS += ../gui/overviewstatus.h ../gui/overviewboard.h

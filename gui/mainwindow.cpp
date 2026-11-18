@@ -4,6 +4,7 @@
 #include <QHeaderView>
 #include "apptheme.h"
 #include "overviewstatus.h"
+#include "overviewboard.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -50,8 +51,8 @@ MainWindow::MainWindow(QWidget *parent) :
     for (int column = 0; column < 4; ++column)
         overviewHeader->setSectionResizeMode(column, QHeaderView::Interactive);
     // Qt QTreeView::setSortingEnabled(false) also turns OFF header clicks.
-    // Disable sorting first, then explicitly re-enable header clicks so
-    // sectionClicked(2) opens our Status menu without enabling sorting.
+    // Keep both Status (column 2) and URI (column 3) filter menus clickable
+    // without enabling sorting or changing the original thread order.
     ui->threadOverview->setSortingEnabled(false);
     overviewHeader->setSectionsClickable(true);
 
@@ -85,7 +86,10 @@ MainWindow::MainWindow(QWidget *parent) :
                            .toString().trimmed().toLower();
     if (!OverviewStatus::keys().contains(overviewStatusFilter))
         overviewStatusFilter = QStringLiteral("all");
+    overviewBoardFilter = OverviewBoard::normalizeFilter(
+                settings->value("thread_overview/board_filter", QString()).toString());
     refreshOverviewStatusHeader();
+    refreshOverviewBoardHeader();
 
     overviewWidthSaveTimer = new QTimer(this);
     overviewWidthSaveTimer->setInterval(500);
@@ -109,7 +113,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(overviewHeader, SIGNAL(sectionResized(int,int,int)),
             this, SLOT(scheduleOverviewWidthSave()));
     connect(overviewHeader, SIGNAL(sectionClicked(int)),
-            this, SLOT(showOverviewStatusFilter(int)));
+            this, SLOT(showOverviewFilter(int)));
 
     connect(requestHandler, SIGNAL(response(QUrl,QByteArray,bool)), this, SLOT(processRequestResponse(QUrl,QByteArray,bool)));
     connect(requestHandler, SIGNAL(responseError(QUrl,int)), this, SLOT(githubUpdateCheckFailed(QUrl,int)));
@@ -462,6 +466,7 @@ void MainWindow::saveSettings(void) {
     settings->setValue("col_images_width", ui->threadOverview->columnWidth(1));
     settings->setValue("col_status_width", ui->threadOverview->columnWidth(2));
     settings->setValue("status_filter", overviewStatusFilter);
+    settings->setValue("board_filter", overviewBoardFilter);
     settings->setValue("visible", ui->threadOverview->isVisible());
     settings->endGroup();
 
@@ -798,17 +803,20 @@ void MainWindow::updateThreadOverview() {
         delete obsolete;
     }
 
-    applyOverviewStatusFilter();
+    applyOverviewFilters();
     addThreadOverviewMark(ui->tabWidget->currentIndex());
 }
 
-void MainWindow::applyOverviewStatusFilter() {
+void MainWindow::applyOverviewFilters() {
+    // Hide non-matching rows; never sort, remove, or remap their tab pointers.
     for (int i = 0; i < ui->threadOverview->topLevelItemCount(); ++i) {
         QTreeWidgetItem *item = ui->threadOverview->topLevelItem(i);
         const QPointer<UIImageOverview> tab = overviewRowTabs.value(item);
-        const bool matches = tab && (overviewStatusFilter == QLatin1String("all")
+        const bool matchesStatus = tab && (overviewStatusFilter == QLatin1String("all")
                     || OverviewStatus::categoryFor(tab->getStatus()) == overviewStatusFilter);
-        item->setHidden(!matches);
+        const bool matchesBoard = tab && OverviewBoard::matchesFilter(
+                    tab->getURI(), overviewBoardFilter);
+        item->setHidden(!(matchesStatus && matchesBoard));
     }
 }
 
@@ -823,7 +831,11 @@ void MainWindow::refreshOverviewStatusHeader() {
                    : tr("Filter: %1 — click to change").arg(label));
 }
 
-void MainWindow::showOverviewStatusFilter(int section) {
+void MainWindow::showOverviewFilter(int section) {
+    if (section == 3) {
+        showOverviewBoardFilter();
+        return;
+    }
     if (section != 2)
         return;
 
@@ -863,6 +875,65 @@ void MainWindow::showOverviewStatusFilter(int section) {
     settings->setValue("thread_overview/status_filter", overviewStatusFilter);
     settings->sync();
     refreshOverviewStatusHeader();
+    updateThreadOverview();
+}
+
+void MainWindow::refreshOverviewBoardHeader() {
+    const bool allBoards = overviewBoardFilter.isEmpty();
+    const QString label = OverviewBoard::labelFor(overviewBoardFilter);
+    ui->threadOverview->headerItem()->setText(
+                3, allBoards ? tr("URI") : tr("URI (%1)").arg(label));
+    ui->threadOverview->headerItem()->setToolTip(
+                3, allBoards ? tr("Click to filter threads by board")
+                             : tr("Board filter: %1 — click to change").arg(label));
+}
+
+void MainWindow::showOverviewBoardFilter() {
+    // Build the menu from every open thread, including rows hidden by Status
+    // or a previous board filter. An active board stays selectable at zero.
+    QHash<QString, int> counts;
+    for (int i = 0; i < ui->tabWidget->count(); ++i) {
+        UIImageOverview *tab = static_cast<UIImageOverview*>(ui->tabWidget->widget(i));
+        const QString board = OverviewBoard::boardForUrl(tab->getURI());
+        if (!board.isEmpty())
+            counts[board] += 1;
+    }
+    if (!overviewBoardFilter.isEmpty() && !counts.contains(overviewBoardFilter))
+        counts.insert(overviewBoardFilter, 0);
+
+    QMenu menu(ui->threadOverview);
+    QAction *all = menu.addAction(tr("All boards (%1)").arg(ui->tabWidget->count()));
+    all->setCheckable(true);
+    all->setChecked(overviewBoardFilter.isEmpty());
+    all->setData(QString());
+    menu.addSeparator();
+
+    QStringList boards = counts.keys();
+    boards.sort(Qt::CaseInsensitive);
+    for (const QString &board : boards) {
+        QAction *action = menu.addAction(
+                    QString("%1 (%2)").arg(OverviewBoard::labelFor(board))
+                                      .arg(counts.value(board)));
+        action->setCheckable(true);
+        action->setChecked(board == overviewBoardFilter);
+        action->setData(board);
+    }
+
+    QHeaderView *header = ui->threadOverview->header();
+    const QPoint menuPoint = header->mapToGlobal(
+                QPoint(header->sectionViewportPosition(3), header->height()));
+    QAction *picked = menu.exec(menuPoint);
+    if (!picked)
+        return;
+
+    const QString requested = picked->data().toString();
+    if ((!requested.isEmpty() && !boards.contains(requested)) ||
+            requested == overviewBoardFilter)
+        return;
+    overviewBoardFilter = requested;
+    settings->setValue("thread_overview/board_filter", overviewBoardFilter);
+    settings->sync();
+    refreshOverviewBoardHeader();
     updateThreadOverview();
 }
 
