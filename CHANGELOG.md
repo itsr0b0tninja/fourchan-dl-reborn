@@ -1,5 +1,12 @@
 # Changelog — 4chan Downloader Reborn
 
+## v1.1.0 — Video thumbnails and thumbnail captions (unreleased; source only)
+- Show thumbnail previews for downloaded MP4 and WebM files using the JPEG preview provided by 4chan. Fetch previews on the background thumbnail worker and cache them separately from older video placeholders; fall back to the existing missing-image icon if a preview is unavailable.
+- Display the file extension (for example, .jpg, .jpeg, .gif, .mp4 or .webm) above each thumbnail's file path.
+- Add independent **Settings → Thumbnails** checkboxes to show or hide the extension and the full file path. Both are enabled by default, apply immediately to existing thumbnails, and are remembered between sessions.
+- Keep actual filenames separate from the displayed captions so opening, deleting, reloading and thumbnail-cache cleanup continue to use the correct paths. Double-clicking videos opens the default external media player.
+- Add source regression checks for caption combinations, exact video-preview URL validation and path preservation. No build or release has been run for v1.1.0.
+
 ## v1.0.1 — Thread Overview board filter
 - Click the URI column header to filter open threads by board, such as /b/, /s/ or /r9k/, with an All boards option.
 - Populate the menu from all open threads, show board counts and remember the chosen board in settings.ini between sessions.

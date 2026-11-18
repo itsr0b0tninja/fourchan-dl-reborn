@@ -1,5 +1,6 @@
 ﻿#include "uiimageoverview.h"
 #include "ui_uiimageoverview.h"
+#include "thumbnailmetadata.h"
 #include <QHBoxLayout>
 #include <QFrame>
 #include <QDir>
@@ -80,6 +81,8 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
     thumbnailCheckTimer->setSingleShot(true);
 
     thumbnailsizeLocked = false;
+    showThumbnailExtension = true;
+    showThumbnailPath = true;
     closeWhenFinished = false;
     downloading = false;
     running = false;
@@ -152,7 +155,7 @@ bool UIImageOverview::setThumbnailSize(QSize s) {
         return false;
     iconSize = s;
     ui->listWidget->setIconSize(iconSize);
-    ui->listWidget->setGridSize(QSize(iconSize.width()+10, iconSize.height()+20));
+    ui->listWidget->setGridSize(QSize(iconSize.width()+10, iconSize.height()+55));
     thumbnailsizeLocked = true;
     return true;
 }
@@ -288,10 +291,24 @@ void UIImageOverview::triggerRescan(void) {
     }
 }
 
-void UIImageOverview::createThumbnail(QString s) {
+void UIImageOverview::createThumbnail(QString s, QString sourceUri) {
     QString thumbnail_location;
     if (!_threadBlocked) {
-        thumbnail_location = tnt->addToList(s);
+        QString previewUri;
+        if (!sourceUri.isEmpty()) {
+            const int index = imageIndexByUrl.value(sourceUri, -1);
+            if (index >= 0 && ThumbnailMetadata::isVideo(s))
+                previewUri = images.at(index).thumbURI;
+        }
+        if (previewUri.isEmpty() && ThumbnailMetadata::isVideo(s)) {
+            for (const _IMAGE &image : images) {
+                if (image.savedAs == s) {
+                    previewUri = image.thumbURI;
+                    break;
+                }
+            }
+        }
+        thumbnail_location = tnt->addToList(s, previewUri);
         QLOG_TRACE() << Q_FUNC_INFO << ":: Adding thumbnail for" << s;
         pendingThumbnails.append(s);
 
@@ -315,8 +332,10 @@ void UIImageOverview::addThumbnail(QString filename, QString tnFilename) {
 
     QListWidgetItem* item = new QListWidgetItem(
                 QIcon(tnFilename),
-                filename,
+                ThumbnailMetadata::label(filename, showThumbnailExtension, showThumbnailPath),
                 ui->listWidget);
+    item->setData(Qt::UserRole, filename);
+    item->setToolTip(filename);
     ui->listWidget->addItem(item);
     thumbnailsizeLocked = true;
     ++thumbnailCount;
@@ -359,7 +378,7 @@ void UIImageOverview::deleteFile(void) {
     QString uri;
     QString cacheFile;
 
-    filename = ui->listWidget->currentItem()->text();
+    filename = ThumbnailMetadata::filePath(ui->listWidget->currentItem());
     if (filename != "") {
         f.setFileName(filename);
 
@@ -386,7 +405,7 @@ void UIImageOverview::reloadFile(void) {
     bool checkOrgFilename;
     bool checkLargeURI;
 
-    filename = ui->listWidget->currentItem()->text();
+    filename = ThumbnailMetadata::filePath(ui->listWidget->currentItem());
     if (filename != "") {
         f.setFileName(filename);
 
@@ -422,19 +441,23 @@ void UIImageOverview::openFile(void) {
     QString filename;
     QStringList slImageList;
 
-    filename = ui->listWidget->currentItem()->text();
+    filename = ThumbnailMetadata::filePath(ui->listWidget->currentItem());
     if (filename != "") {
-        if (settings->value("options/use_internal_viewer", false).toBool()) {
+        if (settings->value("options/use_internal_viewer", false).toBool() &&
+                !ThumbnailMetadata::isVideo(filename)) {
             for (int i=0; i<images.length(); i++) {
-                if ((images.at(i).downloaded) && !blackList->contains(images.at(i).largeURI)) {
+                if (images.at(i).downloaded &&
+                        !ThumbnailMetadata::isVideo(images.at(i).savedAs) &&
+                        !blackList->contains(images.at(i).largeURI))
                     slImageList << images.at(i).savedAs;
-                }
             }
             imageViewer->setImageList(slImageList);
-            imageViewer->setCurrentImage(ui->listWidget->currentItem()->text());
+            imageViewer->setCurrentImage(filename);
         }
         else {
-            QDesktopServices::openUrl(QUrl(QString("file:///%1").arg(filename)));
+            // The internal viewer handles still images; videos open in the
+            // system's configured media player instead.
+            QDesktopServices::openUrl(QUrl::fromLocalFile(filename));
         }
     }
 }
@@ -759,7 +782,7 @@ void UIImageOverview::closeEvent(QCloseEvent *event)
     QStringList fileList;
     for (int i=0; i<ui->listWidget->count(); i++) {
         fileList.append(tnt->getCacheFile(
-                            ui->listWidget->item(i)->text()
+                            ThumbnailMetadata::filePath(ui->listWidget->item(i))
                             )
                     );
     }
@@ -831,7 +854,27 @@ void UIImageOverview::loadSettings() {
 }
 
 void UIImageOverview::updateSettings() {
-    setThumbnailSize(QSize(settings->value("options/thumbnail_width",150).toInt(),settings->value("options/thumbnail_height",150).toInt()));
+    settings->sync();
+    setThumbnailSize(QSize(settings->value("options/thumbnail_width",150).toInt(),
+                           settings->value("options/thumbnail_height",150).toInt()));
+    showThumbnailPath = settings->value("options/show_thumbnail_path", true).toBool();
+    showThumbnailExtension = settings->value("options/show_thumbnail_extension", true).toBool();
+    refreshThumbnailCaptions();
+}
+
+void UIImageOverview::refreshThumbnailCaptions() {
+    for (int i = 0; i < ui->listWidget->count(); ++i) {
+        QListWidgetItem *item = ui->listWidget->item(i);
+        const QString filename = ThumbnailMetadata::filePath(item);
+        item->setText(ThumbnailMetadata::label(
+                filename, showThumbnailExtension, showThumbnailPath));
+        item->setToolTip(filename);
+    }
+    // Reserve only the space needed by the selected caption lines.
+    const int extraHeight = (showThumbnailExtension ? 22 : 0) +
+                            (showThumbnailPath ? 33 : 0) + 12;
+    ui->listWidget->setGridSize(
+                QSize(iconSize.width() + 10, iconSize.height() + extraHeight));
 }
 
 void UIImageOverview::useOriginalFilenames(bool b) {
@@ -993,7 +1036,7 @@ void UIImageOverview::deleteAllThumbnails() {
 
     for (int i=0; i<ui->listWidget->count(); i++) {
         fileList.append(tnt->getCacheFile(
-                            ui->listWidget->item(i)->text()
+                            ThumbnailMetadata::filePath(ui->listWidget->item(i))
                             )
                         );
     }
@@ -1005,9 +1048,9 @@ void UIImageOverview::deleteAllFiles() {
     QStringList files;
 
     for (int i=0; i<ui->listWidget->count(); i++) {
-        files.append(ui->listWidget->item(i)->text());
+        files.append(ThumbnailMetadata::filePath(ui->listWidget->item(i)));
         files.append(tnt->getCacheFile(
-                            ui->listWidget->item(i)->text()
+                            ThumbnailMetadata::filePath(ui->listWidget->item(i))
                             )
                         );
     }
@@ -1019,7 +1062,7 @@ void UIImageOverview::deleteAllFiles() {
 void UIImageOverview::processDownloadedFile(QUrl url, QString filename) {
     if (_threadBlocked)
         return;
-    createThumbnail(filename);
+    createThumbnail(filename, url.toString());
     setCompleted(url.toString(), filename);
 }
 
@@ -1077,7 +1120,7 @@ void UIImageOverview::processRequestResponse(QUrl url, QByteArray ba, bool cache
                 errorHandler(url, 503);
                 return;
             }
-            createThumbnail(destination);
+            createThumbnail(destination, requestURI);
             setCompleted(requestURI, destination);
         }
         else {
@@ -1216,7 +1259,7 @@ bool UIImageOverview::getNextImage(QString* s) {
             const QFileInfo existing(destination);
             if (existing.isFile() && existing.size() > 0
                     && (image.expectedSize <= 0 || existing.size() == image.expectedSize)) {
-                createThumbnail(destination);
+                createThumbnail(destination, image.largeURI);
                 setCompleted(image.largeURI, destination);
                 continue;
             }
@@ -1336,7 +1379,7 @@ bool UIImageOverview::addImage(_IMAGE img) {
     imageIndexByUrl.insert(img.largeURI, images.count());
     images.append(img);
     if (fileExists && !img.savedAs.isEmpty())
-        createThumbnail(img.savedAs);
+        createThumbnail(img.savedAs, img.largeURI);
     return !fileExists;
 }
 
@@ -1493,7 +1536,7 @@ void UIImageOverview::rebuildThumbnails() {
 
     for (int i=0; i<images.length(); i++) {
         if (images.at(i).downloaded && !images.at(i).savedAs.isEmpty()) {
-            createThumbnail(images.at(i).savedAs);
+            createThumbnail(images.at(i).savedAs, images.at(i).largeURI);
         }
     }
 }

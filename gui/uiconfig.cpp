@@ -135,6 +135,10 @@ void UIConfig::loadSettings(void) {
 
     b = settings->value("hq_thumbnails",true).toBool();
         ui->cbHQThumbnail->setChecked(b);
+    ui->cbShowThumbnailPath->setChecked(
+                settings->value("show_thumbnail_path", true).toBool());
+    ui->cbShowThumbnailExtension->setChecked(
+                settings->value("show_thumbnail_extension", true).toBool());
 
     b = settings->value("default_original_filename",false).toBool();
         ui->cbDefaultOriginalFilename->setChecked(b);
@@ -339,6 +343,8 @@ bool UIConfig::saveConfiguration() {
         settings->setValue("resume_session", ui->cbReopenTabs->isChecked());
         settings->setValue("enlarge_thumbnails", ui->cbEnlargeThumbnails->isChecked());
         settings->setValue("hq_thumbnails", ui->cbHQThumbnail->isChecked());
+        settings->setValue("show_thumbnail_path", ui->cbShowThumbnailPath->isChecked());
+        settings->setValue("show_thumbnail_extension", ui->cbShowThumbnailExtension->isChecked());
         settings->setValue("default_original_filename", ui->cbDefaultOriginalFilename->isChecked());
         settings->setValue("remember_directory", ui->cbRememberDirectory->isChecked());
 

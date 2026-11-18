@@ -248,14 +248,34 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="0">
+       <item row="3" column="0" colspan="2">
+        <widget class="QCheckBox" name="cbShowThumbnailExtension">
+         <property name="text">
+          <string>Show file extension below thumbnails</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0" colspan="2">
+        <widget class="QCheckBox" name="cbShowThumbnailPath">
+         <property name="text">
+          <string>Show file path below thumbnails</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
         <widget class="QLabel" name="label_14">
          <property name="text">
           <string>Thumbnail cache folder</string>
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
+       <item row="5" column="1">
         <layout class="QHBoxLayout" name="horizontalLayout_5">
          <item>
           <widget class="QLineEdit" name="leThumbnailCacheFolder"/>
@@ -273,7 +293,7 @@
          </item>
         </layout>
        </item>
-       <item row="4" column="0">
+       <item row="6" column="0">
         <widget class="QLabel" name="label_16">
          <property name="toolTip">
           <string>Thumbnail Time to live</string>
@@ -283,7 +303,7 @@
          </property>
         </widget>
        </item>
-       <item row="4" column="1">
+       <item row="6" column="1">
         <widget class="QSpinBox" name="sbThumbnailTTL">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -302,7 +322,7 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="0" colspan="2">
+       <item row="7" column="0" colspan="2">
         <layout class="QHBoxLayout" name="horizontalLayout_7">
          <item>
           <widget class="QPushButton" name="btnDeleteAllThumbnails">

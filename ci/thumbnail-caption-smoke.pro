@@ -1,0 +1,9 @@
+QT += core gui widgets
+TEMPLATE = app
+CONFIG += console c++11
+CONFIG -= app_bundle
+TARGET = thumbnail-caption-smoke
+DESTDIR = ../portable
+INCLUDEPATH += ../gui
+SOURCES += thumbnail-caption-smoke.cpp
+HEADERS += ../gui/thumbnailmetadata.h

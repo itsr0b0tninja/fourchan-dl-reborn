@@ -9,7 +9,7 @@
 - **Thread monitoring:** Open several threads in separate tabs, automatically rescan for new attachments, or refresh a thread manually.
 - **Images and video:** Download images, WebM and MP4 files. Choose whether to download videos globally or override the setting for individual threads.
 - **Reliable downloads:** Configurable concurrent downloads, automatic retries and retry delays, including handling for temporary rate limits.
-- **Thumbnail browser:** Browse saved images as thumbnails, rebuild the thumbnail cache, and open or remove individual files.
+- **Thumbnail browser:** Browse saved images and video previews as thumbnails, choose whether to display file extensions or paths, rebuild the thumbnail cache, and open or remove individual files.
 - **Image viewer:** View images inside the app, navigate between them, rotate them, or open them in an external viewer.
 - **Folder management:** Choose a download location per thread, save folder shortcuts, retain original filenames, and move a thread's files to the configured destination.
 - **Thread Overview:** See thread status and image counts in one place, filter threads by status or board (such as `/b/` and `/r9k/`), and mark threads as viewed.

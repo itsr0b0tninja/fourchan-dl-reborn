@@ -79,6 +79,8 @@ jobs:
           mingw32-make -j2
           qmake-qt5 parser-domain-smoke.pro
           mingw32-make -j2
+          qmake-qt5 thumbnail-caption-smoke.pro
+          mingw32-make -j2
           # Validate parser domains without a network connection.
           ../portable/parser-domain-smoke.exe
           rm -f ../portable/parser-domain-smoke.exe
@@ -93,6 +95,10 @@ jobs:
           # widths and that hiding rows leaves their original indexes intact.
           QT_QPA_PLATFORM=offscreen ../portable/overview-status-smoke.exe
           rm -f ../portable/overview-status-smoke.exe
+          # Verify caption display combinations and that thumbnail file
+          # operations use the original path, not the visible label.
+          QT_QPA_PLATFORM=offscreen ../portable/thumbnail-caption-smoke.exe
+          rm -f ../portable/thumbnail-caption-smoke.exe
           # Program Information: readable nested labels, horizontal scrolling,
           # first-tab default and session-persistent expanded component groups.
           QT_QPA_PLATFORM=offscreen ../portable/program-info-smoke.exe

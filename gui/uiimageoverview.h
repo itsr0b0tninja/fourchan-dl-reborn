@@ -102,6 +102,8 @@ private:
     QThread* parserThread;
 
     bool thumbnailsizeLocked;
+    bool showThumbnailPath;
+    bool showThumbnailExtension;
     bool running;
     bool closeWhenFinished;
     bool downloading;
@@ -131,13 +133,14 @@ private:
     bool addImage(_IMAGE img);
     QString getSavepath();
     void updateExpectedThumbnailCount();
+    void refreshThumbnailCaptions();
     void updateMoveThreadButton();
 
 private slots:
     void on_listWidget_customContextMenuRequested(QPoint pos);
     void chooseLocation(void);
     void triggerRescan(void);
-    void createThumbnail(QString);
+    void createThumbnail(QString, QString sourceUri = QString());
     void deleteFile(void);
     void deleteAllFiles(void);
     void reloadFile(void);

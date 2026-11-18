@@ -12,6 +12,8 @@
 #include <QFile>
 #include <QCoreApplication>
 #include <QDir>
+#include <QHash>
+#include <QUrl>
 #include "QsLog.h"
 
 class ThumbnailCreator : public QObject
@@ -20,7 +22,7 @@ class ThumbnailCreator : public QObject
 public:
     explicit ThumbnailCreator(QObject *parent = 0);
     void setIconSize(QSize s);
-    QString addToList(QString s);
+    QString addToList(QString s, QString videoPreviewUrl = QString());
     QString getCacheFile(QString);
     void halt();
     void resume();
@@ -30,6 +32,7 @@ public:
 
 private:
     QStringList list;
+    QHash<QString, QString> videoPreviews;
     QSize* iconSize;
     volatile bool halted;
     QSettings* settings;
@@ -38,6 +41,7 @@ private:
     QString cacheFolder;
     QMutex mutex;
     QWaitCondition condition;
+    QImage fetchVideoPreview(const QString &previewUri) const;
 
 
 signals:

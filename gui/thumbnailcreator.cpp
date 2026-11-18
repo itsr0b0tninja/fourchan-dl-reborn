@@ -1,4 +1,11 @@
 ﻿#include "thumbnailcreator.h"
+#include "thumbnailmetadata.h"
+#include "fourchanrequestheaders.h"
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QEventLoop>
+#include <QTimer>
 
 ThumbnailCreator::ThumbnailCreator(QObject *parent) :
     QObject(parent)
@@ -16,6 +23,7 @@ void ThumbnailCreator::go() {
     QImage original, tn;
     QString cacheFile;
     QString currentFilename;
+    QString currentVideoPreview;
     QDir dir;
     int iconWidth;
     int iconHeight;
@@ -31,12 +39,17 @@ void ThumbnailCreator::go() {
             if (list.count()>0 && !halted) {
                 currentFilename = list.front();
                 list.pop_front();
+                currentVideoPreview = videoPreviews.take(currentFilename);
                 newImages = true;
                 cacheFile = getCacheFile(currentFilename);
             }
         mutex.unlock();
 
         if (newImages) {
+            // The worker reuses these images; never carry a previous job's
+            // image into a failed video-preview request.
+            original = QImage();
+            tn = QImage();
             bool useCachedThumbnail;
             bool image_loaded;
 
@@ -67,10 +80,16 @@ void ThumbnailCreator::go() {
 
             if (!useCachedThumbnail){
                 QLOG_TRACE() << "ThumbnailCreator :: Creating new thumbnail for " << currentFilename;
-                if (original.load(currentFilename)) {
+                if (ThumbnailMetadata::isVideo(currentFilename) &&
+                        !currentVideoPreview.isEmpty()) {
+                    original = fetchVideoPreview(currentVideoPreview);
+                    image_loaded = !original.isNull();
+                }
+                if (!image_loaded && !ThumbnailMetadata::isVideo(currentFilename)
+                        && original.load(currentFilename)) {
                     image_loaded = true;
                 }
-                else {
+                if (!image_loaded) {
                     if (QFile::exists(currentFilename)) {
                         QLOG_DEBUG() << Q_FUNC_INFO << ":: Image" << currentFilename << "cannot be processed. Using default thumbnail instead.";
                         if (original.load(":/icons/resources/image-missing.png")) {
@@ -124,6 +143,51 @@ void ThumbnailCreator::go() {
     }
 }
 
+QImage ThumbnailCreator::fetchVideoPreview(const QString &previewUri) const {
+    const QUrl url = ThumbnailMetadata::videoPreviewUrl(previewUri);
+    if (url.isEmpty())
+        return QImage();
+
+    // This runs inside the thumbnail worker, so it never blocks the GUI.
+    // A short deadline prevents unavailable thumbnails from stalling the
+    // queue indefinitely; all failures fall back to image-missing.png.
+    QNetworkAccessManager manager;
+    QNetworkRequest request(url);
+    request.setRawHeader("User-Agent", FourchanRequestHeaders::defaultUserAgent());
+    request.setRawHeader("Accept", "image/jpeg,image/*;q=0.8");
+    const QString board = url.path().section('/', 1, 1);
+    request.setRawHeader("Referer", QString("https://boards.4chan.org/%1/")
+                                      .arg(board).toUtf8());
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::ManualRedirectPolicy);
+    QNetworkReply *reply = manager.get(request);
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+    QObject::connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+    QObject::connect(&timeout, SIGNAL(timeout()), &loop, SLOT(quit()));
+    timeout.start(8000);
+    if (!reply->isFinished())
+        loop.exec();
+
+    QImage result;
+    if (reply->isFinished() && reply->error() == QNetworkReply::NoError &&
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200 &&
+            reply->bytesAvailable() <= 2 * 1024 * 1024) {
+        const QByteArray bytes = reply->readAll();
+        result.loadFromData(bytes, "JPG");
+        if (result.width() > 4096 || result.height() > 4096)
+            result = QImage();
+    } else {
+        if (!reply->isFinished())
+            reply->abort();
+        QLOG_DEBUG() << "ThumbnailCreator :: 4chan video preview unavailable:"
+                     << previewUri;
+    }
+    delete reply;
+    return result;
+}
+
 void ThumbnailCreator::setIconSize(QSize s) {
     mutex.lock();
     iconSize->setWidth(s.width());
@@ -131,12 +195,15 @@ void ThumbnailCreator::setIconSize(QSize s) {
     mutex.unlock();
 }
 
-QString ThumbnailCreator::addToList(QString s) {
+QString ThumbnailCreator::addToList(QString s, QString videoPreviewUrl) {
     QString ret;
 
     mutex.lock();
-    // Even an already-queued thumbnail must return its expected cache path.
+    // An already queued file can gain its video-preview URL later.
+    // Return its expected cache path regardless of whether it was queued.
     ret = getCacheFile(s);
+    if (ThumbnailMetadata::isVideo(s) && !videoPreviewUrl.isEmpty())
+        videoPreviews.insert(s, videoPreviewUrl);
     if (!list.contains(s)) {
         list.append(s);
         newImages = true;
@@ -152,7 +219,12 @@ QString ThumbnailCreator::getCacheFile(QString filename) {
 
     tmp = filename;
     tmp.replace( QRegExp( "[" + QRegExp::escape( "\\/:*?\"<>|" ) + "]" ), QString( "_" ) );
-    ret= QString("%1/%2.tn").arg(cacheFolder).arg(tmp);
+    // A new cache key prevents old placeholder images generated for MP4/WebM
+    // by pre-v1.1.0 builds from hiding real 4chan video previews.
+    const QString suffix = ThumbnailMetadata::isVideo(filename)
+                           ? QStringLiteral(".video-preview.tn")
+                           : QStringLiteral(".tn");
+    ret = QString("%1/%2%3").arg(cacheFolder, tmp, suffix);
 
     return ret;
 }
@@ -166,12 +238,14 @@ void ThumbnailCreator::halt() {
 void ThumbnailCreator::resume() {
     mutex.lock();
     halted = false;
+    condition.wakeAll();
     mutex.unlock();
 }
 void ThumbnailCreator::requestStop() {
     mutex.lock();
     stopping = true;
     list.clear();
+    videoPreviews.clear();
     condition.wakeAll();
     mutex.unlock();
 }
