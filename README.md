@@ -12,7 +12,7 @@ A maintained, portable Windows build of the original **fourchan-dl** downloader,
 2. Extract into its own folder and run `4chan-dl-reborn.exe`.
 3. For later **published** versions use **Check for Updates** inside the program, then install the offered update.
 
-The owner confirmed successful in-program updating and verified the v0.2.0 attachment-failure UI on Windows. v0.2.1 adds streaming file writes, faster rescan lookups, and more efficient blacklist checks without redesigning the interface.
+For milestone releases such as v0.5.0, the GitHub Release also includes a complete portable ZIP. Existing installations can continue using Check for Updates. The portable ZIP should be extracted to a fresh directory, not over an installation containing personal data.
 
 ## Features
 
@@ -21,7 +21,9 @@ The owner confirmed successful in-program updating and verified the v0.2.0 attac
 - Resume monitoring previously opened tabs after restarting.
 - Thumbnail browser, folder shortcuts, and basic per-file actions.
 - Portable Qt 5 application with a built-in updater linked to this repository.
-- v0.2.2: Browser-compatible MP4/WebM CDN request headers (User-Agent, board Referer, and full-file range) to address persistent HTTP 429 responses.
+- Robust streamed attachment downloads, retries, and video CDN request headers.
+- Qt5 Fusion Light/Dark themes and the simplified Thread Overview status filter.
+- v0.5.0: curated portable image plugins and narrowly scoped removal of known obsolete Qt4/old updater files; user data is never targeted.
 
 **Scope:** The Windows portable release currently includes the 4chan parser. Historical support for other imageboards in upstream code is not included in the release package.
 

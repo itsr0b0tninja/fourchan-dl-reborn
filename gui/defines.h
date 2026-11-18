@@ -3,11 +3,7 @@
 
 #ifdef Q_OS_WIN
 #define APP_NAME        "4chan-dl-reborn.exe"
-#if QT_VERSION < 0x050000
-#define UPDATE_TREE     "win32"
-#else
 #define UPDATE_TREE     "win32-qt5"
-#endif
 #define USE_UPDATER
 #define CONSOLE_APPNAME "fourchan-dl-console.exe"
 #else

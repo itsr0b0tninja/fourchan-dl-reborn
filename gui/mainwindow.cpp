@@ -1182,24 +1182,16 @@ void MainWindow::createComponentList() {
     QString version;
 #endif
 
-#ifdef Q_OS_WIN32
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
-    qtFiles << "Qt5Core" << "Qt5Gui" << "Qt5Widgets" << "Qt5Network" << "Qt5Xml";
-    // Qt 5 UCRT64 release libraries (not obsolete Qt4/OpenSSL 1.x DLL names).
+#ifdef Q_OS_WIN
+    // Enumerate only Qt5 modules actually bundled with the release.
+    qtFiles << "Qt5Core" << "Qt5Gui" << "Qt5Widgets" << "Qt5Network" << "Qt5Svg";
     neededLibraries << "libssl-3-x64.dll" << "libcrypto-3-x64.dll"
                     << "libstdc++-6.dll" << "libgcc_s_seh-1.dll"
                     << "libwinpthread-1.dll"
                     << "imageformats/qgif.dll" << "imageformats/qico.dll"
                     << "imageformats/qjpeg.dll" << "imageformats/qsvg.dll"
+                    << "imageformats/qtiff.dll" << "imageformats/qwebp.dll"
                     << "platforms/qwindows.dll";
-
-#else
-    qtFiles << "QtCore4" << "QtGui4" << "QtNetwork4" << "QtXml4";
-    neededLibraries << "libeay32.dll" << "ssleay32.dll" << "imageformats/qgif4.dll"
-                    << "imageformats/qico4.dll" << "imageformats/qjpeg4.dll"
-                    << "imageformats/qmng4.dll" << "imageformats/qsvg4.dll"
-                    << "imageformats/qtiff4.dll";
-#endif
 #endif
 
     components.clear();
@@ -1254,7 +1246,7 @@ void MainWindow::createComponentList() {
 #endif
 
     foreach (QString f, qtFiles) {
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
         c.filename = QString("%1.dll").arg(f);
 #else
 #ifdef Q_OS_LINUX

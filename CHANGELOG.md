@@ -1,5 +1,15 @@
 # Changelog — 4chan Downloader Reborn
 
+## v0.5.0 — Legacy runtime and portable package cleanup
+- Audit the v0.4.6 Windows runtime dependencies and the original Qt4 migration paths. Keep modern Qt5, ICU, UCRT, OpenSSL 3, parser and standalone updater dependencies intact.
+- Ship only the useful Qt5 image plugins: GIF, ICO, JPEG, SVG, TIFF and WebP. Qt itself supports PNG. Remove the unused ICNS, JPEG 2000, MNG, TGA and WBMP codecs from the **new portable ZIP**, avoiding their additional dependent libraries.
+- On startup, if the current Qt5 updater is installed, remove only an exact allowlist of obsolete Qt4, OpenSSL 1.x, old MinGW and retired updater files, plus the legacy Vista style plugin. Remove styles/ only if empty; never scan or delete other files.
+- Protect settings.ini, black.list, logs, downloads, thumbnails, custom plugins, unknown files and every current Qt5/OpenSSL 3 dependency. Keep the old updater fallback intact until a modern updater is actually present.
+- Simplify obsolete Qt4 startup and program information branches. Stop trying to copy upd4t3r.exe from the application root when it is installed directly in updater/.
+- Keep the separate updater runtime, including its required duplicate DLLs, to allow the updater to replace the main executable safely.
+- Add automated Windows checks for narrow legacy cleanup, protected user data and modern updater gating; separately verify the selected image decoders load from the actual portable package with no runner dependencies.
+- Publish a complete Windows portable milestone ZIP alongside the regular in-program executable update.
+
 ## v0.4.6 — Program Information cleanup
 - Tidy the existing three-tab Program Information dialog without enlarging or redesigning it. Open on the main program information tab by default.
 - Present the installed/latest version, build date, Qt build version, download totals, warranty and GPLv3 details clearly; show "Not checked" until the updater has provided a latest version.

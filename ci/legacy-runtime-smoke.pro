@@ -1,0 +1,10 @@
+QT += core
+QT -= gui
+TEMPLATE = app
+CONFIG += console c++11
+CONFIG -= app_bundle
+TARGET = legacy-runtime-smoke
+DESTDIR = ../portable
+INCLUDEPATH += ../gui
+SOURCES += legacy-runtime-smoke.cpp
+HEADERS += ../gui/legacyruntimecleanup.h

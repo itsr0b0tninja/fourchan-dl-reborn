@@ -1,11 +1,10 @@
 ﻿#include <QApplication>
 #include <QtDebug>
 
-#if QT_VERSION < 0x050000
-#include <QCleanlooksStyle>
-#endif
-
 #include <QFile>
+#include <QFileInfo>
+#include <QDir>
+#include <QSettings>
 #include <QDateTime>
 #include <QSslSocket>
 #include <QThread>
@@ -17,11 +16,12 @@
 #include "pluginmanager.h"
 #include "uiimageviewer.h"
 #include "apptheme.h"
+#include "legacyruntimecleanup.h"
 #include "QsLog.h"
 #include "QsLogDest.h"
 
-#if QT_VERSION < 0x040000
- #error "Sorry mate, this application needs Qt4.x.x to run properly."
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+#error "4chan Downloader Reborn requires Qt5 or newer."
 #endif
 
 DownloadManager* downloadManager;
@@ -35,7 +35,6 @@ QTextStream logOutput;
 MainWindow* mainWindow;
 
 void checkEnvironment();
-bool checkIfNewerVersion(QString, QString);
 
 int main(int argc, char *argv[])
 {
@@ -121,99 +120,53 @@ int main(int argc, char *argv[])
 }
 
 void checkEnvironment() {
-    QDir dir;
-    QDir updaterDir;
-    QDir pluginDir;
-    QStringList neededFiles;
-    QStringList qt4Files;
-    QFile f;
-    QSettings settings("settings.ini", QSettings::IniFormat);
-
-    dir.setPath(QApplication::applicationDirPath());
-    updaterDir.setPath(dir.path()+"/updater");
-    pluginDir.setPath(dir.path()+"/plugins");
+    // Reborn is a Qt5 portable application. Keep all runtime and user files
+    // in the application directory; only the standalone updater is allowed
+    // to have its own Qt/SSL dependencies.
+    const QDir root(QCoreApplication::applicationDirPath());
+    if (!root.exists(QStringLiteral("updater")))
+        root.mkdir(QStringLiteral("updater"));
+    if (!root.exists(QStringLiteral("plugins")))
+        root.mkdir(QStringLiteral("plugins"));
 
 #ifdef Q_OS_WIN
-#if (QT_VERSION >= 0x050000)
-    neededFiles << "Qt5Core.dll" << "Qt5Network.dll" << "libgcc_s_seh-1.dll" << "libstdc++-6.dll" << "upd4t3r.exe" << "libwinpthread-1.dll";
-    qt4Files << "QtCore4.dll" << "QtGui4.dll" << "libgcc_s_dw2-1.dll" << "QtNetwork4.dll" << "QtXml4.dll" << "imageformats/qgif4.dll";
-    qt4Files << "imageformats/qico4.dll" << "imageformats/qjpeg4.dll" << "imageformats/qmng4.dll" << "imageformats/qsvg4.dll";
-    qt4Files << "imageformats/qtiff4.dll" << "updater/libgcc_s_dw2-1.dll" << "updater/mingwm10.dll" << "updater/QtCore4.dll" << "updater/QtNetwork4.dll";
-
-    // Clean up qt4 files, but only after the updater is at least version 1.2
-    if (checkIfNewerVersion(settings.value("updater/version", "0.0").toString(),"1.1")) {
-        foreach (QString filename, qt4Files) {
-            if (QFile::exists(QString("%1/%2").arg(dir.absolutePath()).arg(filename))) {
-                if (f.remove(QString("%1/%2").arg(dir.absolutePath()).arg(filename))) {
-                    QLOG_INFO() << "APP :: Deleting Qt4 file " << filename;
-                }
-            }
-        }
+    // Bootstrap missing updater dependencies from existing root DLLs, but do
+    // not try to copy upd4t3r.exe from the root: it is installed directly
+    // inside updater/ in every Reborn Qt5 portable release.
+    const QStringList updaterDependencies = QStringList()
+            << QStringLiteral("Qt5Core.dll")
+            << QStringLiteral("Qt5Network.dll")
+            << QStringLiteral("libgcc_s_seh-1.dll")
+            << QStringLiteral("libstdc++-6.dll")
+            << QStringLiteral("libwinpthread-1.dll")
+            << QStringLiteral("libssl-3-x64.dll")
+            << QStringLiteral("libcrypto-3-x64.dll");
+    for (const QString &file : updaterDependencies) {
+        const QString source = root.filePath(file);
+        const QString destination = root.filePath(QStringLiteral("updater/") + file);
+        if (!QFileInfo::exists(source) || QFileInfo::exists(destination))
+            continue;
+        if (!QFile::copy(source, destination))
+            QLOG_WARN() << "APP :: Could not copy updater dependency" << file;
     }
-#else
-    neededFiles << "QtCore4.dll" << "QtNetwork4.dll" << "mingwm10.dll" << "libgcc_s_dw2-1.dll" << "upd4t3r.exe";
 #endif
+
+    const QString modernUpdater = root.filePath(QStringLiteral("updater/upd4t3r.exe"));
+    const QString legacyUpdater = root.filePath(QStringLiteral("updater/au.exe"));
+    updaterFileName.clear();
+    if (QFileInfo(modernUpdater).isFile()) {
+        updaterFileName = QStringLiteral("updater/upd4t3r.exe");
+#ifdef Q_OS_WIN
+        // Explicit names only. No recursive deletion or wildcard cleanup.
+        // Never delete settings.ini, threads, thumbnails, logs or unknown files.
+        const QStringList removed = LegacyRuntimeCleanup::removeObsoleteFiles(root.path());
+        for (const QString &file : removed)
+            QLOG_INFO() << "APP :: Removed obsolete pre-Qt5 file:" << file;
 #endif
-
-    // Check for updater folders
-    if (!updaterDir.exists()) {
-        QLOG_INFO() << "APP :: updater directory does not exists. Creating " << QString("%1/updater").arg(dir.absolutePath());
-        dir.mkdir("updater");
-    }
-
-    // Check if all files are present
-    foreach (QString filename, neededFiles) {
-        if (!QFile::exists(QString("%1/%2").arg(updaterDir.absolutePath()).arg(filename))) {
-            QLOG_INFO() << "APP :: " << QString("%1/%2").arg(updaterDir.absolutePath()).arg(filename) << "does not exists - copying from application dir";
-            if (!f.copy(QString("%1/%2").arg(dir.absolutePath()).arg(filename), QString("%1/%2").arg(updaterDir.absolutePath()).arg(filename))) {
-                QLOG_WARN() << "APP :: Copying " << QString("%1/%2").arg(dir.absolutePath()).arg(filename) << ">" << QString("%1/%2").arg(updaterDir.absolutePath()).arg(filename) << "failed";
-            }
-        }
-    }
-
-    updaterFileName = "";
-    if (QFile::exists(QDir(dir.path()).absoluteFilePath("updater/upd4t3r.exe"))) {
-        // The new updater is already present
-        // Use this for updating the components
-        // If old updater still exists, delete it because it's not needed anymore
-        updaterFileName = "updater/upd4t3r.exe";
-        QFile::remove("au.exe");
-        QFile::remove("updater/au.exe");
-    }
-    else if (QFile::exists("updater/au.exe")) {
-        updaterFileName = "updater/au.exe";
-    }
-    else {
+    } else if (QFileInfo(legacyUpdater).isFile()) {
+        // Preserve the fallback for installations not yet fully migrated.
+        updaterFileName = QStringLiteral("updater/au.exe");
+    } else {
         QLOG_WARN() << "APP :: No updater found!";
     }
-
-    // Check for plugin folders
-    if (!pluginDir.exists()) {
-        QLOG_INFO()  << "APP :: Plugin directory does not exists. Creating " << QString("%1/plugins").arg(dir.absolutePath());
-        dir.mkdir("plugins");
-    }
-}
-
-bool checkIfNewerVersion(QString _new, QString _old) {
-    bool ret;
-    QStringList newVersion, oldVersion;
-
-    ret = false;
-
-    newVersion = _new.split(".");
-    oldVersion = _old.split(".");
-
-    for (int i=0; i<newVersion.count(); i++) {
-        if (newVersion.value(i).toInt() > oldVersion.value(i, "0").toInt()) {
-            ret = true;
-            break;
-        }
-        else {
-            if (oldVersion.value(i, "0").toInt() > newVersion.value(i).toInt()) {
-                break;
-            }
-        }
-    }
-
-    return ret;
 }
