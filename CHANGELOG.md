@@ -1,6 +1,6 @@
 # Changelog — 4chan Downloader Reborn
 
-## Unreleased — Repository-only source cleanup (no version change)
+## v1.0.0 — First complete Windows release
 - v0.6 audit follow-up: correct parser initialization-request indexing and strict official-host matching (including boards.4channel.org); correct thumbnail-size success reporting.
 - Remove dormant thumbnail notification branch while preserving cache polling; remove the unused empty running-request API, obsolete console version probe, unreachable updater menu line and no-op thumbnail-remover stop method.
 - Standardize the application name and window title to "4Chan Downloader Reborn" without a version suffix. Installed version remains visible in Program Information and available for updates.
@@ -8,8 +8,8 @@
 - Remove the discontinued console frontend and the five historic non-4chan parser projects, which are not part of the maintained Windows release.
 - Remove an unreferenced ThumbnailCache placeholder, unused OS/2/macOS source resources, duplicate resource entries and image assets unused by the GUI or Qt resource file.
 - Update the root and parser qmake projects to match the active GUI, 4chan parser and updater; remove stale project references to absent readme/settings files.
-- Preserve all live downloader, parser, updater, Qt5 compatibility, application data protection, and regression-test code. No application logic refactor or release-version change.
-- Commit as source cleanup with CI skipped; a future release should still run the complete Windows regression tests.
+- Preserve all live downloader, parser, updater, Qt5 compatibility, application data protection, and regression-test code. Major class refactoring is deferred until after v1.0.0.
+- Validate the release through the complete Windows build and regression tests, and distribute a full portable ZIP, main executable and matching v1.0.0 4chan parser DLL.
 
 ## v0.5.0 — Legacy runtime and portable package cleanup
 - Audit the v0.4.6 Windows runtime dependencies and the original Qt4 migration paths. Keep modern Qt5, ICU, UCRT, OpenSSL 3, parser and standalone updater dependencies intact.

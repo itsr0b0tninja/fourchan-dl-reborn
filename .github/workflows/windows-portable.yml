@@ -332,13 +332,13 @@ jobs:
           @"
           <updates>
           <win32-qt5>
-          <file name="4chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="$env:REBORN_VERSION" source="$base/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
+          <file name="4Chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="$env:REBORN_VERSION" source="$base/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
           <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="$parserVersion" source="$parserBase/parser4chan.dll" target="plugins/parser4chan.dll" />
           </win32-qt5>
           </updates>
           "@ | Set-Content -Path 'release-assets/webupdate.xml' -Encoding utf8
           @"
-          4chan Downloader Reborn $tag
+          4Chan Downloader Reborn $tag
 
           Incremental updater release: individually distributed components.
           Milestone versions ending .0 include a complete portable ZIP.
@@ -354,11 +354,13 @@ jobs:
           if (Test-Path 'dist/4chan-dl-reborn-win64-portable.zip') {
             Copy-Item dist/4chan-dl-reborn-win64-portable.zip release-assets/
           }
-          Get-FileHash -Algorithm SHA256 release-assets/*.exe | ForEach-Object {
-            "$($_.Hash)  $($_.Path | Split-Path -Leaf)"
-          } | Set-Content -Path release-assets/SHA256SUMS.txt -Encoding ascii
+          Get-ChildItem release-assets -File |
+            Where-Object { $_.Name -notin @('release-notes.txt', 'SHA256SUMS.txt') } |
+            Sort-Object Name | Get-FileHash -Algorithm SHA256 | ForEach-Object {
+              "$($_.Hash)  $($_.Path | Split-Path -Leaf)"
+            } | Set-Content -Path release-assets/SHA256SUMS.txt -Encoding ascii
           $assets = @(Get-ChildItem release-assets -File | Where-Object { $_.Name -ne 'release-notes.txt' } | ForEach-Object { $_.FullName })
-          gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "4chan Downloader Reborn $tag" --notes-file release-assets/release-notes.txt $assets
+          gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "4Chan Downloader Reborn $tag" --notes-file release-assets/release-notes.txt $assets
           if ($LASTEXITCODE -ne 0) { throw "Failed to publish $tag" }
 
       - name: Create release updater manifest and assets
@@ -374,7 +376,7 @@ jobs:
           cat > release-assets/webupdate.xml << EOF
           <updates>
           <win32-qt5>
-          <file name="4chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="$version" source="$url/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
+          <file name="4Chan Downloader Reborn" filename="4chan-dl-reborn.exe" type="executable" version="$version" source="$url/4chan-dl-reborn.exe" target="4chan-dl-reborn.exe" />
           <file name="4chan parser" filename="parser4chan.dll" type="plugin/parser" version="$parser_version" source="$parser_url/parser4chan.dll" target="plugins/parser4chan.dll" />
           </win32-qt5>
           </updates>
