@@ -27,6 +27,8 @@ For milestone releases such as v0.5.0, the GitHub Release also includes a comple
 
 **Scope:** The Windows portable release currently includes the 4chan parser. Historical support for other imageboards in upstream code is not included in the release package.
 
+The current source tree contains only the supported Windows GUI, 4chan parser, standalone updater and active build/tests. Unshipped historical parsers and the discontinued console frontend were removed from `master` during repository cleanup; previous versions remain available through Git history.
+
 ## Project workflow
 
 This repository intentionally uses **one source branch: `master`**.

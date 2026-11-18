@@ -90,18 +90,10 @@ RESOURCES += \
 include(QsLog.pri)
 
 win32: RC_FILE = fourchan-dl-win.rc
-os2: RC_FILE = fourchan-dl-os2.rc
-macx: ICON = resources/fourchan-dl.icns
 
 BUILDDATE = __DATE__
 VERSION = 0.5.0
 DEFINES += BUILDDATE=$${BUILDDATE} PROGRAM_VERSION="\\\"$${VERSION}\\\"" __GUI__
-#DEFINES += QT_NO_URL_CAST_FROM_STRING
-#DEFINES += QT_NO_CAST_FROM_ASCII
 
 win32: LIBS += -lole32
 
-OTHER_FILES += \
-    readme.txt \
-    settings.ini \
-    fourchan-dl.rc

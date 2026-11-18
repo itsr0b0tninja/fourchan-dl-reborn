@@ -1,5 +1,12 @@
 # Changelog — 4chan Downloader Reborn
 
+## Unreleased — Repository-only source cleanup (no version change)
+- Remove the discontinued console frontend and the five historic non-4chan parser projects, which are not part of the maintained Windows release.
+- Remove an unreferenced ThumbnailCache placeholder, unused OS/2/macOS source resources, duplicate resource entries and image assets unused by the GUI or Qt resource file.
+- Update the root and parser qmake projects to match the active GUI, 4chan parser and updater; remove stale project references to absent readme/settings files.
+- Preserve all live downloader, parser, updater, Qt5 compatibility, application data protection, and regression-test code. No application logic refactor or release-version change.
+- Commit as source cleanup with CI skipped; a future release should still run the complete Windows regression tests.
+
 ## v0.5.0 — Legacy runtime and portable package cleanup
 - Audit the v0.4.6 Windows runtime dependencies and the original Qt4 migration paths. Keep modern Qt5, ICU, UCRT, OpenSSL 3, parser and standalone updater dependencies intact.
 - Ship only the useful Qt5 image plugins: GIF, ICO, JPEG, SVG, TIFF and WebP. Qt itself supports PNG. Remove the unused ICNS, JPEG 2000, MNG, TGA and WBMP codecs from the **new portable ZIP**, avoiding their additional dependent libraries.

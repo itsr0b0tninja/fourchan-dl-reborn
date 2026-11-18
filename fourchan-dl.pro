@@ -1,5 +1,4 @@
-TEMPLATE      = subdirs
-SUBDIRS       = gui\
-                plugins \
-                updater \
-                console
+TEMPLATE = subdirs
+SUBDIRS = gui \
+          plugins \
+          updater
