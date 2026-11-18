@@ -6,6 +6,7 @@
 #include <QNetworkRequest>
 #include <QEventLoop>
 #include <QTimer>
+#include <QMutexLocker>
 
 ThumbnailCreator::ThumbnailCreator(QObject *parent) :
     QObject(parent)
@@ -24,6 +25,7 @@ void ThumbnailCreator::go() {
     QString cacheFile;
     QString currentFilename;
     QString currentVideoPreview;
+    QSize currentSize;
     QDir dir;
     int iconWidth;
     int iconHeight;
@@ -40,8 +42,9 @@ void ThumbnailCreator::go() {
                 currentFilename = list.front();
                 list.pop_front();
                 currentVideoPreview = videoPreviews.take(currentFilename);
+                currentSize = *iconSize;
                 newImages = true;
-                cacheFile = getCacheFile(currentFilename);
+                cacheFile = getCacheFileForSize(currentFilename, currentSize);
             }
         mutex.unlock();
 
@@ -53,8 +56,10 @@ void ThumbnailCreator::go() {
             bool useCachedThumbnail;
             bool image_loaded;
 
-            iconWidth = iconSize->width();
-            iconHeight = iconSize->height();
+            // Use one size snapshot for the cache key and the actual image.
+            // The settings UI may update the shared size while we work.
+            iconWidth = currentSize.width();
+            iconHeight = currentSize.height();
             enlargeThumbnails = settings->value("options/enlarge_thumbnails", false).toBool();
             hqRendering = settings->value("options/hq_thumbnails", false).toBool();
             cacheFolder = settings->value("options/thumbnail_cache_folder", QString("%1/%2").arg(QCoreApplication::applicationDirPath())
@@ -68,14 +73,19 @@ void ThumbnailCreator::go() {
 
             useCachedThumbnail = false;
             image_loaded = false;
+            // Track the requested dimensions/options inside the cached PNG.
+            // Merely matching one side let v1.1.0 reuse undersized images
+            // after users increased their thumbnail settings.
+            const QString cacheSignature =
+                    QStringLiteral("v1.1.1:%1x%2:enlarge=%3:hq=%4")
+                        .arg(iconWidth).arg(iconHeight)
+                        .arg(enlargeThumbnails ? 1 : 0).arg(hqRendering ? 1 : 0);
             // Check if thumbnail exists
             if (QFile::exists(cacheFile)) {
                 QLOG_TRACE() << "ThumbnailCreator :: Cached thumbnail available for " << currentFilename;
-                tn.load(cacheFile);
-
-                if (tn.width() == iconWidth || tn.height() == iconHeight) {
+                if (tn.load(cacheFile) &&
+                        tn.text(QStringLiteral("RebornThumbnailOptions")) == cacheSignature)
                     useCachedThumbnail = true;
-                }
             }
 
             if (!useCachedThumbnail){
@@ -106,22 +116,28 @@ void ThumbnailCreator::go() {
 
                 if (image_loaded) {
                     QLOG_TRACE() << "ThumbnailCreator :: Loaded original file " << currentFilename;
+                    // 4chan video previews are often smaller than the
+                    // configured thumbnail size. Upscale them smoothly for
+                    // consistent-size tiles, without changing the preference
+                    // for whether ordinary still images are enlarged.
+                    const bool videoPreview = ThumbnailMetadata::isVideo(currentFilename);
                     if (original.width()<iconWidth
                         && original.height()<iconHeight
-                        && !(enlargeThumbnails)) {
+                        && !enlargeThumbnails && !videoPreview) {
                         QLOG_TRACE() << "ThumbnailCreator :: Setting original as thumbnail";
                         tn = original;
                     } else {
                         QLOG_TRACE() << "ThumbnailCreator :: Rendering thumbnail";
 
-                        if (hqRendering) {
-                            tn = original.scaled(*iconSize,Qt::KeepAspectRatio,Qt::SmoothTransformation);
+                        if (hqRendering || videoPreview) {
+                            tn = original.scaled(currentSize,Qt::KeepAspectRatio,Qt::SmoothTransformation);
                         }
                         else {
-                            tn = original.scaled(*iconSize,Qt::KeepAspectRatio,Qt::FastTransformation);
+                            tn = original.scaled(currentSize,Qt::KeepAspectRatio,Qt::FastTransformation);
                         }
                     }
 
+                    tn.setText(QStringLiteral("RebornThumbnailOptions"), cacheSignature);
                     tn.save(cacheFile, "PNG");
                     QLOG_TRACE() << "ThumbnailCreator :: Saving thumbnail as " << cacheFile;
                 }
@@ -201,7 +217,7 @@ QString ThumbnailCreator::addToList(QString s, QString videoPreviewUrl) {
     mutex.lock();
     // An already queued file can gain its video-preview URL later.
     // Return its expected cache path regardless of whether it was queued.
-    ret = getCacheFile(s);
+    ret = getCacheFileForSize(s, *iconSize);
     if (ThumbnailMetadata::isVideo(s) && !videoPreviewUrl.isEmpty())
         videoPreviews.insert(s, videoPreviewUrl);
     if (!list.contains(s)) {
@@ -215,18 +231,23 @@ QString ThumbnailCreator::addToList(QString s, QString videoPreviewUrl) {
 }
 
 QString ThumbnailCreator::getCacheFile(QString filename) {
-    QString tmp, ret;
+    QMutexLocker locker(&mutex);
+    return getCacheFileForSize(filename, *iconSize);
+}
 
-    tmp = filename;
-    tmp.replace( QRegExp( "[" + QRegExp::escape( "\\/:*?\"<>|" ) + "]" ), QString( "_" ) );
-    // A new cache key prevents old placeholder images generated for MP4/WebM
-    // by pre-v1.1.0 builds from hiding real 4chan video previews.
+QString ThumbnailCreator::getCacheFileForSize(const QString &filename,
+                                              const QSize &size) const {
+    QString safeName = filename;
+    safeName.replace(QRegExp("[" + QRegExp::escape("\\/:*?\"<>|") + "]"),
+                     QStringLiteral("_"));
+    // Different thumbnail sizes get different files. This prevents the GUI
+    // from displaying an old cached image before the worker can regenerate
+    // it at the user's newly chosen dimensions.
     const QString suffix = ThumbnailMetadata::isVideo(filename)
                            ? QStringLiteral(".video-preview.tn")
                            : QStringLiteral(".tn");
-    ret = QString("%1/%2%3").arg(cacheFolder, tmp, suffix);
-
-    return ret;
+    return QStringLiteral("%1/%2.%3x%4%5")
+            .arg(cacheFolder, safeName).arg(size.width()).arg(size.height()).arg(suffix);
 }
 
 void ThumbnailCreator::halt() {

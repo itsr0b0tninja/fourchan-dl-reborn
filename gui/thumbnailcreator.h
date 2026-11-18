@@ -42,6 +42,7 @@ private:
     QMutex mutex;
     QWaitCondition condition;
     QImage fetchVideoPreview(const QString &previewUri) const;
+    QString getCacheFileForSize(const QString &filename, const QSize &size) const;
 
 
 signals:

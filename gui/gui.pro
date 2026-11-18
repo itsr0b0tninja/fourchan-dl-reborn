@@ -95,7 +95,7 @@ include(QsLog.pri)
 win32: RC_FILE = fourchan-dl-win.rc
 
 BUILDDATE = __DATE__
-VERSION = 1.1.0
+VERSION = 1.1.1
 DEFINES += BUILDDATE=$${BUILDDATE} PROGRAM_VERSION="\\\"$${VERSION}\\\"" __GUI__
 
 win32: LIBS += -lole32

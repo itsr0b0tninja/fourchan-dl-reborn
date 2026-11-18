@@ -72,7 +72,21 @@ int main(int argc, char **argv) {
                "reject preview query parameters"))
         return 5;
 
-    qInfo() << "PASS: mp4/webm identification; four caption modes;"
-               " original filename preserved; official HTTPS previews only.";
+    const QSize icon(200, 160);
+    const QSize thumbnailsOnly = ThumbnailMetadata::gridCellSize(icon, false, false, 19);
+    const QSize extensionOnly = ThumbnailMetadata::gridCellSize(icon, true, false, 19);
+    const QSize pathOnly = ThumbnailMetadata::gridCellSize(icon, false, true, 19);
+    const QSize bothCaptions = ThumbnailMetadata::gridCellSize(icon, true, true, 19);
+    if (!check(thumbnailsOnly == QSize(216, 168), "compact thumbnail-only tiles") ||
+        !check(extensionOnly == QSize(216, 191), "extension adds one line") ||
+        !check(pathOnly == QSize(216, 191), "path adds one line") ||
+        !check(bothCaptions == QSize(216, 210), "both captions add two lines") ||
+        !check(bothCaptions.height() < 160 + 65, "no excessive blank space") ||
+        !check(ThumbnailMetadata::gridCellSize(QSize(350, 280), false, false, 19)
+                 == QSize(366, 288), "changed icon dimensions affect cell dimensions"))
+        return 6;
+
+    qInfo() << "PASS: video/extension types, four caption modes, compact"
+               " grid sizes, original file paths, official HTTPS previews.";
     return 0;
 }

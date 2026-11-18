@@ -524,8 +524,11 @@ void MainWindow::loadOptions(void) {
         thumbnailSize.setHeight(settings->value("thumbnail_height", 200).toInt());
         maxDownloads = settings->value("concurrent_downloads", 1).toInt();
 
+        // Update the shared thumbnail worker size first, so a tab that
+        // refreshes cached thumbnails sees the matching cache key.
+        tnt->setIconSize(QSize(settings->value("thumbnail_width",150).toInt(),
+                               settings->value("thumbnail_height",150).toInt()));
         updateWidgetSettings();
-        tnt->setIconSize(QSize(settings->value("thumbnail_width",150).toInt(),settings->value("thumbnail_height",150).toInt()));
     settings->endGroup();
 
     settings->beginGroup("network");

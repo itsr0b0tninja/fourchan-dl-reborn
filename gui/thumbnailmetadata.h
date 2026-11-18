@@ -7,6 +7,7 @@
 #include <QStringList>
 #include <QUrl>
 #include <QRegExp>
+#include <QSize>
 
 // Keep the actual disk path separate from its optional visual caption.
 // Delete, reload, open and thumbnail-cache actions must never receive
@@ -38,6 +39,17 @@ inline QString label(const QString &path, bool showExtension, bool showPath) {
     if (showPath)
         lines << path;
     return lines.join(QLatin1String("\n"));
+}
+
+// Fixed icon size plus just enough room for the visible captions.
+// Avoid storing long full paths in the cell's height calculation.
+inline QSize gridCellSize(const QSize &iconSize, bool showExtension,
+                         bool showPath, int lineSpacing) {
+    const int lines = (showExtension ? 1 : 0) + (showPath ? 1 : 0);
+    const int captionHeight = lines == 0
+            ? 0 : 4 + lines * qMax(12, lineSpacing);
+    return QSize(iconSize.width() + 16,
+                 iconSize.height() + 8 + captionHeight);
 }
 
 inline QString filePath(const QListWidgetItem *item) {

@@ -80,7 +80,6 @@ UIImageOverview::UIImageOverview(QWidget *parent) :
     thumbnailCheckTimer->setInterval(5000+time.msec());
     thumbnailCheckTimer->setSingleShot(true);
 
-    thumbnailsizeLocked = false;
     showThumbnailExtension = true;
     showThumbnailPath = true;
     closeWhenFinished = false;
@@ -151,13 +150,13 @@ UIImageOverview::~UIImageOverview()
 }
 
 bool UIImageOverview::setThumbnailSize(QSize s) {
-    if (thumbnailsizeLocked)
-        return false;
-    iconSize = s;
+    // Thumbnail dimensions are user settings, not a one-time value.
+    // In v1.1.0 this was locked after the first item was created.
+    const QSize bounded(qBound(10, s.width(), 500), qBound(10, s.height(), 500));
+    const bool changed = iconSize != bounded;
+    iconSize = bounded;
     ui->listWidget->setIconSize(iconSize);
-    ui->listWidget->setGridSize(QSize(iconSize.width()+10, iconSize.height()+55));
-    thumbnailsizeLocked = true;
-    return true;
+    return changed;
 }
 
 void UIImageOverview::start(void) {
@@ -337,7 +336,6 @@ void UIImageOverview::addThumbnail(QString filename, QString tnFilename) {
     item->setData(Qt::UserRole, filename);
     item->setToolTip(filename);
     ui->listWidget->addItem(item);
-    thumbnailsizeLocked = true;
     ++thumbnailCount;
 
     if (this->isVisible())
@@ -855,11 +853,27 @@ void UIImageOverview::loadSettings() {
 
 void UIImageOverview::updateSettings() {
     settings->sync();
-    setThumbnailSize(QSize(settings->value("options/thumbnail_width",150).toInt(),
-                           settings->value("options/thumbnail_height",150).toInt()));
+    const bool resized = setThumbnailSize(QSize(
+            settings->value("options/thumbnail_width",150).toInt(),
+            settings->value("options/thumbnail_height",150).toInt()));
     showThumbnailPath = settings->value("options/show_thumbnail_path", true).toBool();
     showThumbnailExtension = settings->value("options/show_thumbnail_extension", true).toBool();
     refreshThumbnailCaptions();
+
+    if (resized && ui->listWidget->count() > 0) {
+        // Recreate visible entries using the new size-specific cache keys.
+        // Keep the originals on disk, and do not delete cache files from a
+        // background remover while the thumbnail worker may be writing.
+        ui->listWidget->clear();
+        pendingThumbnails.clear();
+        missingThumbs.clear();
+        expectedThumbnailCount = 0;
+        thumbnailCount = 0;
+        for (const _IMAGE &image : images) {
+            if (image.downloaded && !image.savedAs.isEmpty())
+                createThumbnail(image.savedAs, image.largeURI);
+        }
+    }
 }
 
 void UIImageOverview::refreshThumbnailCaptions() {
@@ -870,11 +884,14 @@ void UIImageOverview::refreshThumbnailCaptions() {
                 filename, showThumbnailExtension, showThumbnailPath));
         item->setToolTip(filename);
     }
-    // Reserve only the space needed by the selected caption lines.
-    const int extraHeight = (showThumbnailExtension ? 22 : 0) +
-                            (showThumbnailPath ? 33 : 0) + 12;
-    ui->listWidget->setGridSize(
-                QSize(iconSize.width() + 10, iconSize.height() + extraHeight));
+    // Keep the image itself at the exact configured icon size. Explicit
+    // newline captions get one line each; long paths are elided instead
+    // of wrapping and forcing unusually tall thumbnail cells.
+    ui->listWidget->setWordWrap(false);
+    ui->listWidget->setTextElideMode(Qt::ElideMiddle);
+    ui->listWidget->setGridSize(ThumbnailMetadata::gridCellSize(
+                iconSize, showThumbnailExtension, showThumbnailPath,
+                ui->listWidget->fontMetrics().lineSpacing()));
 }
 
 void UIImageOverview::useOriginalFilenames(bool b) {

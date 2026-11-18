@@ -101,7 +101,6 @@ private:
     QObject* oParser;
     QThread* parserThread;
 
-    bool thumbnailsizeLocked;
     bool showThumbnailPath;
     bool showThumbnailExtension;
     bool running;
